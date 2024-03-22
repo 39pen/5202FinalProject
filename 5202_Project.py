@@ -67,7 +67,7 @@ app.layout = html.Div(children=[
         ], className='metric-container')
     ])
 
-], style={'backgroundColor': '#f0f0f0'})
+], style={'backgroundColor': '#ADD8E6'})
 
 # Add the below into containers section when data combined
 """
