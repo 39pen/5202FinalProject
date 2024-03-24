@@ -5,7 +5,7 @@
 # eg. kill -9 11300
 
 import dash
-from dash import dcc, html
+from dash import dcc, html, State, callback_context
 from dash.dependencies import Input, Output
 import pandas as pd
 import io
@@ -50,6 +50,16 @@ app.layout = html.Div(children=[
             html.H4("Number of Games"),
             html.Div(id='num-games', className='metric-box')
         ], className='metric-container'),
+
+        html.Div(children=[
+            html.H4("Number of Genres"),
+            html.Div(id='num-genres', className='metric-box')
+        ], className='metric-container'),
+
+        html.Div(children=[
+            html.H4("Number of Developers"),
+            html.Div(id='unique-developers', className='metric-box')
+        ], className='metric-container'),
         
         html.Div(children=[
             html.H4("Average Plays"),
@@ -66,37 +76,40 @@ app.layout = html.Div(children=[
             html.Div(id='num-description', className='metric-box')
         ], className='metric-container')
     ]),
-
+    
     # 新增：用于显示时间序列图表的container
     html.Div(id='time-series-chart', style={'width': '100%', 'marginTop': '20px'}),
 
+    # Search bar
+    dcc.Input(id='search-bar', type='text', placeholder='Search for a game...'),
+    html.Button(id='search-button', n_clicks=0, children='Search'),
+
+    # Custom modal (hidden by default)
+    html.Div(id='modal-game-info', style={'display': 'none'}, children=[
+        html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'border-radius': '5px', 'position': 'fixed', 'top': '20%', 'left': '50%', 'transform': 'translate(-50%, -50%)', 'zIndex': '100'}, children=[
+            html.H4("Game Details", id='modal-title'),
+            html.Div(id='game-info'),
+            html.Button('Close', id='modal-close', n_clicks=0),
+        ]),
+        # Overlay to capture clicks outside the modal
+        html.Div(style={'position': 'fixed', 'top': 0, 'left': 0, 'height': '100%', 'width': '100%', 'backgroundColor': 'rgba(0,0,0,0.5)'})
+    ]),
+
+    # Store component for state management
+    dcc.Store(id='store-searched-game', storage_type='session')
 
 ], style={'backgroundColor': '#ADD8E6'})
-
-# Add the below into containers section when data combined
-"""
-        html.Div(children=[
-            html.H4("Number of Genres"),
-            html.Div(id='num-genres', className='metric-box')
-        ], className='metric-container'),
-
-        html.Div(children=[
-            html.H4("Number of Developers"),
-            html.Div(id='unique-developers', className='metric-box')
-        ], className='metric-container'),
-"""
 
 
 # Callback to update the graph based on the uploaded file
 @app.callback(
     [Output('data-summary-text', 'children'),
      Output('num-games', 'children'),
-     #Output('num-genres', 'children'),
-     #Output('unique-developers', 'children'),
+     Output('num-genres', 'children'),
+     Output('unique-developers', 'children'),
      Output('avg-plays', 'children'),
      Output('avg-rating', 'children'),
      Output('num-description', 'children'),
-     
      Output('time-series-chart', 'children')],  # 新增：输出用于显示时间序列图表
     
     [Input('upload-data', 'contents'),
@@ -108,14 +121,12 @@ app.layout = html.Div(children=[
 def update_summary(content, filename, start_date, end_date):
 
     # Initial placeholders for the statistics
-    num_games = avg_plays = avg_rating = num_description = 'N/A'
-    # When data combined, use: num_games = num_genres = unique_developers = avg_plays = avg_rating = num_description = 'N/A'
+    num_games = num_genres = unique_developers = avg_plays = avg_rating = num_description = 'N/A'
     
     graphs = None  # 新增：默认值初始化 graphs
     
     if content is None:
-        return 'Upload a file to see the summary.', num_games, avg_plays, avg_rating, num_description, graphs  # 新增：graphs
-        # When data combined, use: return 'Upload a file to see the summary.', num_games, num_genres, unique_developers, avg_plays, avg_rating, num_description
+        return 'Upload a file to see the summary.', num_games, num_genres, unique_developers, avg_plays, avg_rating, num_description, graphs  # 新增：graphs
 
     # Decode the uploaded file
     content_type, content_string = content.split(',')
@@ -129,8 +140,8 @@ def update_summary(content, filename, start_date, end_date):
     filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))]
     # Overview of data within the selected date range
     num_games = len(filtered_df)
-    #num_genres = filtered_df['genre'].nunique()
-    #unique_developers = filtered_df['developer'].nunique()
+    num_genres = filtered_df['genre'].nunique()
+    unique_developers = filtered_df['developer'].nunique()
     avg_plays = round(filtered_df['plays'].mean(), 2)
     avg_rating = round(filtered_df['rating'].mean(), 2)
     num_description = filtered_df['description'].notna().sum()
@@ -211,14 +222,68 @@ def update_summary(content, filename, start_date, end_date):
 
     graphs = html.Div([graph_html, graph_html2, graph_html3, graph_html4])
 
-
-    
-    
-    #return summary_text, num_games, avg_plays, avg_rating, num_description
-    # When data combined, use: return summary_text, num_games, num_genres, unique_developers, avg_plays, avg_rating, num_description
-
     #新的return
-    return summary_text, num_games, avg_plays, avg_rating, num_description, graphs
+    return return summary_text, num_games, num_genres, unique_developers, avg_plays, avg_rating, num_description, graphs
+
+
+
+# Callback to update the searched game data
+@app.callback(
+    [Output('modal-game-info', 'style'),  # Controls the modal's visibility
+     Output('game-info', 'children')],    # Updates the modal's content
+    [Input('search-button', 'n_clicks'),  # Search button clicks
+     Input('modal-close', 'n_clicks')],   # Close button clicks
+    [State('search-bar', 'value'),        # Text input from the user
+     State('upload-data', 'contents')]    # Contents of the uploaded file
+)
+
+def search_game(n_clicks_search, n_clicks_close, search_value, content):
+    ctx = callback_context
+
+    # Determine which button was clicked
+    if not ctx.triggered:
+        button_id = 'No buttons clicked yet'
+    else:
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # If the search button was clicked and there's valid input and file content
+    if button_id == 'search-button' and n_clicks_search and search_value and content:
+        content_type, content_string = content.split(',')
+        decoded = base64.b64decode(content_string)
+        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+        # Normalize case for a case-insensitive full match
+        search_value_lower = search_value.lower()
+        df['name_lower'] = df['name'].str.lower()
+
+        # Check for a full match rather than a partial match
+        match_df = df[df['name_lower'] == search_value_lower]
+        
+        if not match_df.empty:
+            # Assuming the first match is the desired one
+            game_info = match_df.iloc[0][['name', 'date', 'genre', 'developer', 'platform', 'rating', 'wishlists', 'description']].to_dict()
+            game_details = [
+                html.H4(game_info.get('name', 'No Name')),
+                html.P(f"Date: {game_info.get('date', 'No available information')}"),
+                html.P(f"Genre: {game_info.get('genre', 'No available information')}"),
+                html.P(f"Developer: {game_info.get('developer', 'No available information')}"),
+                html.P(f"Platform: {game_info.get('platform', 'No available information')}"),
+                html.P(f"Rating: {game_info.get('rating', 'No available information')}"),
+                html.P(f"Wishlists: {game_info.get('wishlists', 'No available information')}"),
+                html.P(f"Description: {game_info.get('description', 'No description available.')}"),
+            ]
+            return {'display': 'block'}, game_details  # Show modal with details
+        else:
+            # No exact match found
+            no_match_message = html.P("Game information not available.")
+            return {'display': 'block'}, [no_match_message]
+
+    # If the close button was clicked or there's no search action
+    if button_id == 'modal-close' or button_id == 'search-button':
+        return {'display': 'none'}, []  # Hide modal
+
+    # Default return (e.g., initial load)
+    return {'display': 'none'}, []
     
 if __name__ == '__main__':
     app.run_server(debug=True)
