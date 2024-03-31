@@ -14,7 +14,7 @@ from datetime import datetime
 import tabulate
 
 #新添加包（lyc）  
-    
+
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
