@@ -14,6 +14,17 @@ from datetime import datetime
 import tabulate
 import plotly.express as px
 
+
+#新增：cluster analysis所需要的安装包
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.cluster import KMeans
+from dash.exceptions import PreventUpdate
+from dash import dash_table
+from dash.dash_table.Format import Format 
+
 app = dash.Dash(__name__)
 
 
@@ -79,7 +90,8 @@ app.layout = html.Div(children=[
     
     # 新增：用于显示时间序列图表的container
     html.Div(id='time-series-chart', style={'width': '100%', 'marginTop': '20px'}),
-
+    #新增：聚类分析表格container
+    html.Div(id='cluster-analysis-container', style={'display': 'none'}),
     # Search bar
     dcc.Input(id='search-bar', type='text', placeholder='Search for a game...'),
     html.Button(id='search-button', n_clicks=0, children='Search'),
@@ -222,8 +234,8 @@ def update_summary(content, filename, start_date, end_date):
 
     graphs = html.Div([graph_html, graph_html2, graph_html3, graph_html4])
 
-    #新的return
-    return return summary_text, num_games, num_genres, unique_developers, avg_plays, avg_rating, num_description, graphs
+    #新的return（删了一个多的return）
+    return summary_text, num_games, num_genres, unique_developers, avg_plays, avg_rating, num_description, graphs
 
 
 
@@ -287,3 +299,80 @@ def search_game(n_clicks_search, n_clicks_close, search_value, content):
     
 if __name__ == '__main__':
     app.run_server(debug=True)
+
+
+
+#新增：cluster analysis部分
+def generate_cluster_summary_table(df, numeric_features, categorical_features):
+    # 首先，计算数值型特征的平均值
+    numeric_summary = df.groupby('cluster')[numeric_features].mean().reset_index()
+
+    # 对数值型特征进行四舍五入，保留两位小数
+    numeric_summary[numeric_features] = numeric_summary[numeric_features].round(2)
+    
+    # 接下来，找出每个聚类中最常见的分类特征的值
+    for feature in categorical_features:
+        # 对每个聚类，计算每个分类特征的众数，并创建一个新的列来存储这些值
+        mode_series = df.groupby('cluster')[feature].agg(lambda x: x.mode()[0] if not x.mode().empty else 'Unknown').rename(f'most_common_{feature}')
+        # 因为mode_series是Series，所以使用reset_index来转换为DataFrame，以便进行merge操作
+        mode_df = mode_series.reset_index()
+        numeric_summary = numeric_summary.merge(mode_df, on='cluster')
+
+    return numeric_summary
+
+
+@app.callback(
+    [Output('cluster-analysis-container', 'children'),
+     Output('cluster-analysis-container', 'style')],  # 更新style使容器可见
+    [Input('upload-data', 'contents')]
+)
+def update_cluster_analysis(contents):
+    if contents is None:
+        raise PreventUpdate
+    # 解析上传的文件内容
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 解析上传的数据并进行预处理、聚类分析...
+    # 定义预处理转换器
+    numeric_features = ['rating', 'reviews', 'plays']
+    numeric_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='median')),  # 使用中位数填充缺失值
+    ('scaler', StandardScaler())  # 标准化
+    ])
+
+    categorical_features = ['platform', 'genre', 'developer']
+    categorical_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),  # 填充缺失值
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))  # 独热编码
+    ])
+
+# 组合预处理步骤
+    preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', numeric_transformer, numeric_features),
+        ('cat', categorical_transformer, categorical_features)
+    ]
+    )
+
+
+# 假设 df 是你上传的DataFrame
+# 应用预处理
+    X_preprocessed = preprocessor.fit_transform(df)
+
+# 执行K-Means聚类
+    kmeans = KMeans(n_clusters=3, n_init=10, random_state=42)  # 选择聚类数量为3
+    kmeans.fit(X_preprocessed)
+    df['cluster'] = kmeans.labels_
+
+    cluster_summary = generate_cluster_summary_table(df, numeric_features, categorical_features)  # 假设这个函数生成了聚类总结的DataFrame
+
+    # 将DataFrame转换为Dash DataTable
+    table = dash_table.DataTable(
+        data=cluster_summary.to_dict('records'),
+        columns=[{'name': i, 'id': i} for i in cluster_summary.columns]
+    )
+
+    # 返回表格和更新的样式来展示容器
+    return table, {'display': 'block'}
