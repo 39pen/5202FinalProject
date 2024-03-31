@@ -296,9 +296,6 @@ def search_game(n_clicks_search, n_clicks_close, search_value, content):
 
     # Default return (e.g., initial load)
     return {'display': 'none'}, []
-    
-if __name__ == '__main__':
-    app.run_server(debug=True)
 
 
 
@@ -376,3 +373,8 @@ def update_cluster_analysis(contents):
 
     # 返回表格和更新的样式来展示容器
     return table, {'display': 'block'}
+
+
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
