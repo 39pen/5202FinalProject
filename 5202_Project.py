@@ -92,6 +92,8 @@ app.layout = html.Div(children=[
     html.Div(id='time-series-chart', style={'width': '100%', 'marginTop': '20px'}),
     #新增：聚类分析表格container
     html.Div(id='cluster-analysis-container', style={'display': 'none'}),
+    #新增relationship的表格
+    html.Div(id='reviews-rating-chart', style={'width': '100%', 'marginTop': '20px'}),
     # Search bar
     dcc.Input(id='search-bar', type='text', placeholder='Search for a game...'),
     html.Button(id='search-button', n_clicks=0, children='Search'),
@@ -320,50 +322,54 @@ def generate_cluster_summary_table(df, numeric_features, categorical_features):
 
 @app.callback(
     [Output('cluster-analysis-container', 'children'),
-     Output('cluster-analysis-container', 'style')],  # 更新style使容器可见
-    [Input('upload-data', 'contents')]
+     Output('cluster-analysis-container', 'style')],
+    [Input('upload-data', 'contents'),
+     Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date')]
 )
-def update_cluster_analysis(contents):
+def update_cluster_analysis(contents, start_date, end_date):
     if contents is None:
         raise PreventUpdate
+    
     # 解析上传的文件内容
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
 
-    # 解析上传的数据并进行预处理、聚类分析...
+    # 将日期列转换为日期时间格式，并根据开始和结束日期过滤数据
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))].copy()
+    
     # 定义预处理转换器
     numeric_features = ['rating', 'reviews', 'plays']
     numeric_transformer = Pipeline(steps=[
-    ('imputer', SimpleImputer(strategy='median')),  # 使用中位数填充缺失值
-    ('scaler', StandardScaler())  # 标准化
+        ('imputer', SimpleImputer(strategy='median')),  # 使用中位数填充缺失值
+        ('scaler', StandardScaler())  # 标准化
     ])
 
     categorical_features = ['platform', 'genre', 'developer']
     categorical_transformer = Pipeline(steps=[
-    ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),  # 填充缺失值
-    ('onehot', OneHotEncoder(handle_unknown='ignore'))  # 独热编码
+        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),  # 填充缺失值
+        ('onehot', OneHotEncoder(handle_unknown='ignore'))  # 独热编码
     ])
 
-# 组合预处理步骤
+    # 组合预处理步骤
     preprocessor = ColumnTransformer(
-    transformers=[
-        ('num', numeric_transformer, numeric_features),
-        ('cat', categorical_transformer, categorical_features)
-    ]
+        transformers=[
+            ('num', numeric_transformer, numeric_features),
+            ('cat', categorical_transformer, categorical_features)
+        ]
     )
 
+    # 应用预处理
+    X_preprocessed = preprocessor.fit_transform(filtered_df)
 
-# 假设 df 是你上传的DataFrame
-# 应用预处理
-    X_preprocessed = preprocessor.fit_transform(df)
-
-# 执行K-Means聚类
+    # 执行K-Means聚类
     kmeans = KMeans(n_clusters=3, n_init=10, random_state=42)  # 选择聚类数量为3
     kmeans.fit(X_preprocessed)
-    df['cluster'] = kmeans.labels_
+    filtered_df['cluster'] = kmeans.labels_
 
-    cluster_summary = generate_cluster_summary_table(df, numeric_features, categorical_features)  # 假设这个函数生成了聚类总结的DataFrame
+    cluster_summary = generate_cluster_summary_table(filtered_df, numeric_features, categorical_features)  # 生成聚类总结的DataFrame
 
     # 将DataFrame转换为Dash DataTable
     table = dash_table.DataTable(
@@ -378,3 +384,38 @@ def update_cluster_analysis(contents):
 
 if __name__ == '__main__':
     app.run_server(debug=True)
+    
+    
+    
+    
+    
+#新增relationship
+@app.callback(
+    Output('reviews-rating-chart', 'children'),
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_reviews_rating_chart(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+    
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+    
+    # 过滤数据集以符合选择的日期范围
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+    
+    # 生成散点图
+    fig = px.scatter(filtered_df, x='reviews', y='rating', 
+                     title='Relationship between Number of Reviews and Rating',
+                     hover_data=['name'])  # 悬停时显示游戏名称
+    
+    # 转换图表为HTML元素
+    graph_html = dcc.Graph(figure=fig)
+    
+    return graph_html
+    
