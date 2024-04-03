@@ -378,16 +378,9 @@ def update_cluster_analysis(contents, start_date, end_date):
     )
 
     # 返回表格和更新的样式来展示容器
-    return table, {'display': 'block'}
-
-
-
-if __name__ == '__main__':
-    app.run_server(debug=True)
+    return table, {'display': 'block'}   
     
-    
-    
-    
+       
     
 #新增relationship
 @app.callback(
@@ -418,4 +411,9 @@ def update_reviews_rating_chart(start_date, end_date, contents):
     graph_html = dcc.Graph(figure=fig)
     
     return graph_html
+
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
+ 
     
