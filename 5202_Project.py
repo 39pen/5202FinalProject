@@ -55,62 +55,73 @@ app.layout = html.Div(children=[
     html.Div(id='data-summary-text',
              style={'width': '100%'}),
 
-    # Containers for the six metrics
-    html.Div(id='metrics-container', style={'display': 'flex', 'justifyContent': 'space-around', 'flexWrap': 'wrap', 'gap': '20px'}, children=[
-        html.Div(children=[
-            html.H4("Number of Games"),
-            html.Div(id='num-games', className='metric-box')
-        ], className='metric-container'),
-
-        html.Div(children=[
-            html.H4("Number of Genres"),
-            html.Div(id='num-genres', className='metric-box')
-        ], className='metric-container'),
-
-        html.Div(children=[
-            html.H4("Number of Developers"),
-            html.Div(id='unique-developers', className='metric-box')
-        ], className='metric-container'),
+    dcc.Tabs(id="tabs", children = [
         
-        html.Div(children=[
-            html.H4("Average Plays"),
-            html.Div(id='avg-plays', className='metric-box')
-        ], className='metric-container'),
-        
-        html.Div(children=[
-            html.H4("Average Rating"),
-            html.Div(id='avg-rating', className='metric-box')
-        ], className='metric-container'),
-        
-        html.Div(children=[
-            html.H4("Number of Descriptions"),
-            html.Div(id='num-description', className='metric-box')
-        ], className='metric-container')
-    ]),
-    
-    # 新增：用于显示时间序列图表的container
-    html.Div(id='time-series-chart', style={'width': '100%', 'marginTop': '20px'}),
-    #新增：聚类分析表格container
-    html.Div(id='cluster-analysis-container', style={'display': 'none'}),
-    #新增relationship的表格
-    html.Div(id='reviews-rating-chart', style={'width': '100%', 'marginTop': '20px'}),
-    # Search bar
-    dcc.Input(id='search-bar', type='text', placeholder='Search for a game...'),
-    html.Button(id='search-button', n_clicks=0, children='Search'),
+        dcc.Tab(label='Overview', children=[  
+            # Containers for the six metrics
+            html.Div(id='metrics-container', style={'display': 'flex', 'justifyContent': 'space-around', 'flexWrap': 'wrap', 'gap': '20px'}, children=[
+                html.Div(children=[
+                    html.H4("Number of Games"),
+                    html.Div(id='num-games', className='metric-box')
+                ], className='metric-container'),
 
-    # Custom modal (hidden by default)
-    html.Div(id='modal-game-info', style={'display': 'none'}, children=[
-        html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'border-radius': '5px', 'position': 'fixed', 'top': '20%', 'left': '50%', 'transform': 'translate(-50%, -50%)', 'zIndex': '100'}, children=[
-            html.H4("Game Details", id='modal-title'),
-            html.Div(id='game-info'),
-            html.Button('Close', id='modal-close', n_clicks=0),
+                html.Div(children=[
+                    html.H4("Number of Genres"),
+                    html.Div(id='num-genres', className='metric-box')
+                ], className='metric-container'),
+
+                html.Div(children=[
+                    html.H4("Number of Developers"),
+                    html.Div(id='unique-developers', className='metric-box')
+                ], className='metric-container'),
+                
+                html.Div(children=[
+                    html.H4("Average Plays"),
+                    html.Div(id='avg-plays', className='metric-box')
+                ], className='metric-container'),
+                
+                html.Div(children=[
+                    html.H4("Average Rating"),
+                    html.Div(id='avg-rating', className='metric-box')
+                ], className='metric-container'),
+                
+                html.Div(children=[
+                    html.H4("Number of Descriptions"),
+                    html.Div(id='num-description', className='metric-box')
+                ], className='metric-container')
+            ]),
+
+            # Search bar
+            dcc.Input(id='search-bar', type='text', placeholder='Search for a game...'),
+            html.Button(id='search-button', n_clicks=0, children='Search'),
+
+            # Custom modal (hidden by default)
+            html.Div(id='modal-game-info', style={'display': 'none'}, children=[
+                html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'border-radius': '5px', 'position': 'fixed', 'top': '20%', 'left': '50%', 'transform': 'translate(-50%, -50%)', 'zIndex': '100'}, children=[
+                    html.H4("Game Details", id='modal-title'),
+                    html.Div(id='game-info'),
+                    html.Button('Close', id='modal-close', n_clicks=0),
+                ]),
+                # Overlay to capture clicks outside the modal
+                html.Div(style={'position': 'fixed', 'top': 0, 'left': 0, 'height': '100%', 'width': '100%', 'backgroundColor': 'rgba(0,0,0,0.5)'})
+            ]),
+
+            # Store component for state management
+            dcc.Store(id='store-searched-game', storage_type='session'),
         ]),
-        # Overlay to capture clicks outside the modal
-        html.Div(style={'position': 'fixed', 'top': 0, 'left': 0, 'height': '100%', 'width': '100%', 'backgroundColor': 'rgba(0,0,0,0.5)'})
-    ]),
 
-    # Store component for state management
-    dcc.Store(id='store-searched-game', storage_type='session')
+        dcc.Tab(label='Time Series Analysis', children=[
+            # 新增：用于显示时间序列图表的container
+            html.Div(id='time-series-chart', style={'width': '100%', 'marginTop': '20px'}),
+        ]),
+
+        dcc.Tab(label='Other Analysis', children=[    
+            #新增：聚类分析表格container
+            html.Div(id='cluster-analysis-container', style={'display': 'none'}),
+            #新增relationship的表格
+            html.Div(id='reviews-rating-chart', style={'width': '100%', 'marginTop': '20px'}),
+        ]),
+    ]),
 
 ], style={'backgroundColor': '#ADD8E6'})
 
@@ -415,5 +426,4 @@ def update_reviews_rating_chart(start_date, end_date, contents):
 
 if __name__ == '__main__':
     app.run_server(debug=True)
- 
     
