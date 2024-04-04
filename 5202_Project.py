@@ -559,9 +559,9 @@ def update_genre_rating_chart(start_date, end_date, contents):
     genre_avg_rating['color'] = genre_avg_rating['genre'].apply(lambda x: 'Top 3' if x in top_genres.values else 'Other')
 
     # 生成条形图，并使用颜色列来定义每个条形的颜色
-    fig = px.bar(genre_avg_rating, x='genre', y='average_rating', color='color',
-                 title='Average Rating by Genre in Selected Date Range',
-                 color_discrete_map={'Top 3': 'gold', 'Other': 'blue'})
+    fig = px.bar(genre_avg_rating, x='genre', y='average_rating', 
+                 title='Average Rating by Genre in Selected Date Range'
+                 )
 
     # 返回图表
     return dcc.Graph(figure=fig)
@@ -603,9 +603,9 @@ def update_genre_reviews_chart(start_date, end_date, contents):
     genre_avg_reviews['color'] = genre_avg_reviews['genre'].apply(lambda x: 'Top 3' if x in top_genres_reviews.values else 'Other')
 
     # 生成条形图，并使用颜色列来定义每个条形的颜色
-    fig = px.bar(genre_avg_reviews, x='genre', y='average_reviews', color='color',
-                 title='Average Reviews by Genre in Selected Date Range',
-                 color_discrete_map={'Top 3': 'gold', 'Other': 'blue'})
+    fig = px.bar(genre_avg_reviews, x='genre', y='average_reviews', 
+                 title='Average Reviews by Genre in Selected Date Range'
+                 )
 
     # 返回图表
     return dcc.Graph(figure=fig)
