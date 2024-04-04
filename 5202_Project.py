@@ -120,6 +120,15 @@ app.layout = html.Div(children=[
             html.Div(id='cluster-analysis-container', style={'display': 'none'}),
             #新增relationship的表格
             html.Div(id='reviews-rating-chart', style={'width': '100%', 'marginTop': '20px'}),
+            html.Div(id='plays-playing-chart', style={'width': '100%', 'marginTop': '20px'}),
+            dcc.Graph(id='genre-distribution-chart'),
+            html.Div(id='top-games-by-plays'),
+            html.Div(id='genre-rating-chart', style={'width': '100%', 'marginTop': '20px'}),
+            html.Div(id='genre-reviews-chart', style={'width': '100%', 'marginTop': '20px'}),
+            html.Div(id='output-progress'),
+            dcc.Graph(id='platform-distribution-pie'),
+            dcc.Graph(id='developer-distribution-pie'),
+            dcc.Graph(id='rating-comparison-chart'),
         ]),
     ]),
 
@@ -422,6 +431,351 @@ def update_reviews_rating_chart(start_date, end_date, contents):
     graph_html = dcc.Graph(figure=fig)
     
     return graph_html
+
+
+
+
+@app.callback(
+    Output('plays-playing-chart', 'children'),
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_plays_playing_chart(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+    
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+    
+    # 过滤数据集以符合选择的日期范围
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)].copy()
+    
+    # 生成散点图
+    fig = px.scatter(filtered_df, x='plays', y='playing', 
+                     title='Relationship between Plays and Playing',
+                     hover_data=['name'])  # 悬停时显示游戏名称
+    
+    # 转换图表为HTML元素
+    graph_html = dcc.Graph(figure=fig)
+    
+    return graph_html
+
+
+
+@app.callback(
+    Output('genre-distribution-chart', 'figure'),
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_genre_distribution_chart(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+    
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 过滤数据集以符合选择的日期范围
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))].copy()
+    
+    # 拆分 'genre' 列中的字符串为列表
+    filtered_df['genre'] = filtered_df['genre'].str.split(', ')
+    
+    # 展开这些列表为新的行
+    exploded_df = filtered_df.explode('genre')
+    
+    # 按 'genre' 分组并计算每个 'genre' 的游戏数量
+    genre_counts = exploded_df['genre'].value_counts().reset_index()
+    genre_counts.columns = ['genre', 'count']
+    
+    # 使用 Plotly Express 或 Graph Objects 构造图表
+    fig = px.bar(genre_counts, x="genre", y="count", title="Genre Distribution")
+    
+    return fig  # 直接返回构造好的图表对象
+
+
+
+@app.callback(
+    Output('genre-rating-chart', 'children'),  # 确保你的布局中有一个与此ID相对应的组件
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_genre_rating_chart(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 过滤数据集以符合选择的日期范围
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))].copy()
+
+    # 拆分 'genre' 列中的字符串为列表
+    filtered_df['genre'] = filtered_df['genre'].str.split(', ')
+
+    # 展开这些列表为新的行
+    exploded_df = filtered_df.explode('genre')
+
+    # 按 'genre' 分组并计算每个 'genre' 的平均评分
+    genre_avg_rating = exploded_df.groupby('genre')['rating'].mean().reset_index()
+    genre_avg_rating.columns = ['genre', 'average_rating']
+
+    # 找出平均评分前三的 'genre'
+    top_genres = genre_avg_rating.nlargest(3, 'average_rating')['genre']
+
+    # 为平均评分前三的 'genre' 设置颜色，其它的 'genre' 使用默认颜色
+    genre_avg_rating['color'] = genre_avg_rating['genre'].apply(lambda x: 'Top 3' if x in top_genres.values else 'Other')
+
+    # 生成条形图，并使用颜色列来定义每个条形的颜色
+    fig = px.bar(genre_avg_rating, x='genre', y='average_rating', color='color',
+                 title='Average Rating by Genre in Selected Date Range',
+                 color_discrete_map={'Top 3': 'gold', 'Other': 'blue'})
+
+    # 返回图表
+    return dcc.Graph(figure=fig)
+
+
+@app.callback(
+    Output('genre-reviews-chart', 'children'),
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_genre_reviews_chart(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 过滤数据集以符合选择的日期范围
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))].copy()
+
+    # 拆分 'genre' 列中的字符串为列表
+    filtered_df['genre'] = filtered_df['genre'].str.split(', ')
+
+    # 展开这些列表为新的行
+    exploded_df = filtered_df.explode('genre')
+
+    # 按 'genre' 分组并计算每个 'genre' 的平均评论数
+    genre_avg_reviews = exploded_df.groupby('genre')['reviews'].mean().reset_index()
+    genre_avg_reviews.columns = ['genre', 'average_reviews']
+
+    # 找出平均评论数前三的 'genre'
+    top_genres_reviews = genre_avg_reviews.nlargest(3, 'average_reviews')['genre']
+
+    # 为平均评论数前三的 'genre' 设置颜色，其它的 'genre' 使用默认颜色
+    genre_avg_reviews['color'] = genre_avg_reviews['genre'].apply(lambda x: 'Top 3' if x in top_genres_reviews.values else 'Other')
+
+    # 生成条形图，并使用颜色列来定义每个条形的颜色
+    fig = px.bar(genre_avg_reviews, x='genre', y='average_reviews', color='color',
+                 title='Average Reviews by Genre in Selected Date Range',
+                 color_discrete_map={'Top 3': 'gold', 'Other': 'blue'})
+
+    # 返回图表
+    return dcc.Graph(figure=fig)
+
+
+
+
+@app.callback(
+    Output('top-games-by-plays', 'children'),  # 输出到一个展示游戏名称列表的容器
+    [Input('genre-distribution-chart', 'clickData'),     # 监听条形图的点击事件
+     Input('upload-data', 'contents')]          # 同时需要原始数据
+)
+def display_top_games_by_plays(clickData, contents):
+    if clickData is None or contents is None:
+        raise PreventUpdate
+
+    # 解析上传的文件内容
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 获取被点击的 'genre'
+    genre_clicked = clickData['points'][0]['x']
+
+    # 筛选出该 'genre' 的所有游戏并按plays排序，取前五名
+    top_games = df[df['genre'].str.contains(genre_clicked, na=False)].nlargest(5, 'plays')[['name', 'plays']]
+
+    # 生成游戏名称列表
+    children = [html.Div(f"{name}: {plays}", style={'margin': '5px'}) for name, plays in zip(top_games['name'], top_games['plays'])]
+
+    # 返回名称列表
+    return children
+
+
+@app.callback(
+    Output('output-progress', 'children'),
+    [Input('upload-data', 'contents'),
+     Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date')]
+)
+def update_output(contents, start_date, end_date):
+    if contents is None or start_date is None or end_date is None:
+        return 'Please upload a file and select a date range.'
+
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 确保 'date' 列是日期格式
+    df['date'] = pd.to_datetime(df['date'])
+
+    # 筛选选中的时间段和 rating 大于 4 的游戏
+    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date) & (df['rating'] > 3.5)]
+
+    # 计算百分比
+    total_games = len(df[(df['date'] >= start_date) & (df['date'] <= end_date)])
+    high_rating_games = len(filtered_df)
+    if total_games > 0:
+        percentage = (high_rating_games / total_games) * 100
+    else:
+        return 'No games found in the selected date range.'
+
+    # 显示进度条
+    progress_bar = html.Progress(value=str(percentage), max="100")
+
+
+    return html.Div([
+        f'In the selected date range, {high_rating_games} out of {total_games} games have a rating greater than 3.5, which is {percentage:.2f}%.',
+        progress_bar
+    ])
+
+
+@app.callback(
+    Output('platform-distribution-pie', 'figure'),  # 注意更改输出组件ID
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_platform_distribution_pie(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+    
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 转换日期格式并按照指定日期范围过滤数据
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))]
+
+    # 拆分 'platform' 列中的字符串为列表
+    filtered_df['platform'] = filtered_df['platform'].str.split(', ')
+    
+    # 展开这些列表为新的行，使每行只包含一个平台
+    exploded_df = filtered_df.explode('platform')
+
+    # 将非“Windows PC”, “Linux”, “Web browser”的所有平台替换为“others”
+    specified_platforms = ['Windows PC', 'Linux', 'Web browser']
+    exploded_df['platform'] = exploded_df['platform'].apply(lambda x: x if x in specified_platforms else 'others')
+
+    # 按 'platform' 分组并计算每个平台的游戏数量
+    platform_counts = exploded_df['platform'].value_counts().reset_index()
+    platform_counts.columns = ['platform', 'count']
+    
+    # 使用 Plotly Express 构造饼状图
+    fig = px.pie(platform_counts, names="platform", values="count", title="Platform Distribution within Selected Date Range")
+
+    return fig  # 直接返回构造好的图表对象
+
+
+
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+from dash import Dash, html, dcc, Input, Output, callback  # 根据您的Dash版本，导入方式可能略有不同
+
+# 假设以下是您Dash应用的一部分
+
+@app.callback(
+    Output('developer-distribution-pie', 'figure'),  # 修改输出组件ID为developer分布图
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_developer_distribution_pie(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+    
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 转换日期格式并按照指定日期范围过滤数据
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))].copy()
+
+    # 检查 'developer' 列中的字符串是否包含指定的开发者名字
+    conditions = [
+        filtered_df['developer'].str.contains('Sony', case=False, na=False),
+        filtered_df['developer'].str.contains('Microsoft', case=False, na=False),
+        filtered_df['developer'].str.contains('Nintendo', case=False, na=False)
+    ]
+    choices = ['Sony', 'Microsoft', 'Nintendo']
+
+    # 应用条件
+    filtered_df['developer_category'] = np.select(conditions, choices, default='others').copy()
+
+    # 按 'developer_category' 分组并计算每个类别的游戏数量
+    developer_counts = filtered_df['developer_category'].value_counts().reset_index()
+    developer_counts.columns = ['developer', 'count']
+    
+    # 使用 Plotly Express 构造饼状图
+    fig = px.pie(developer_counts, names="developer", values="count", title="Developer Distribution within Selected Date Range")
+
+    return fig
+
+
+
+@app.callback(
+    Output('rating-comparison-chart', 'figure'),
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_rating_comparison_chart(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)].copy()
+
+    # Identify the developer category based on inclusion of Sony, Microsoft, or Nintendo
+    conditions = [
+        filtered_df['developer'].str.contains('Sony', case=False, na=False),
+        filtered_df['developer'].str.contains('Microsoft', case=False, na=False),
+        filtered_df['developer'].str.contains('Nintendo', case=False, na=False)
+    ]
+    choices = ['Sony', 'Microsoft', 'Nintendo']
+    filtered_df['Developer Category'] = np.select(conditions, choices, default='Others').copy()
+
+    # Plotting the box plot
+    fig = px.box(filtered_df, x='Developer Category', y='rating', title='Rating Distribution by Developer Category')
+
+    return fig
 
 
 if __name__ == '__main__':
