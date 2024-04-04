@@ -24,6 +24,7 @@ from sklearn.cluster import KMeans
 from dash.exceptions import PreventUpdate
 from dash import dash_table
 from dash.dash_table.Format import Format 
+import plotly.graph_objs as go
 
 app = dash.Dash(__name__)
 
@@ -117,6 +118,15 @@ app.layout = html.Div(children=[
 
         dcc.Tab(label='Other Analysis', children=[    
             #新增：聚类分析表格container
+            dcc.Graph(id='elbow-method-chart'),
+            dcc.Slider(
+            id='cluster-slider',
+            min=1,
+            max=10,
+            value=4,  # 默认值为3
+            marks={i: str(i) for i in range(1, 11)},
+            step=1
+            ),
             html.Div(id='cluster-analysis-container', style={'display': 'none'}),
             #新增relationship的表格
             html.Div(id='reviews-rating-chart', style={'width': '100%', 'marginTop': '20px'}),
@@ -342,54 +352,54 @@ def generate_cluster_summary_table(df, numeric_features, categorical_features):
 
 @app.callback(
     [Output('cluster-analysis-container', 'children'),
-     Output('cluster-analysis-container', 'style')],
+     Output('cluster-analysis-container', 'style'),
+     Output('elbow-method-chart', 'figure')],
     [Input('upload-data', 'contents'),
      Input('date-picker-range', 'start_date'),
-     Input('date-picker-range', 'end_date')]
+     Input('date-picker-range', 'end_date'),
+     Input('cluster-slider', 'value')]  # 新增输入项
 )
-def update_cluster_analysis(contents, start_date, end_date):
+def update_cluster_analysis(contents, start_date, end_date, n_clusters): 
     if contents is None:
         raise PreventUpdate
-    
+
     # 解析上传的文件内容
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
 
-    # 将日期列转换为日期时间格式，并根据开始和结束日期过滤数据
+    # 转换日期并过滤数据
     df['date'] = pd.to_datetime(df['date'])
     filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))].copy()
     
-    # 定义预处理转换器
     numeric_features = ['rating', 'reviews', 'plays']
     numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),  # 使用中位数填充缺失值
-        ('scaler', StandardScaler())  # 标准化
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler())
     ])
 
     categorical_features = ['platform', 'genre', 'developer']
     categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),  # 填充缺失值
-        ('onehot', OneHotEncoder(handle_unknown='ignore'))  # 独热编码
+        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+        ('onehot', OneHotEncoder(handle_unknown='ignore'))
     ])
-
-    # 组合预处理步骤
+    
+    # 应用预处理步骤
     preprocessor = ColumnTransformer(
         transformers=[
             ('num', numeric_transformer, numeric_features),
             ('cat', categorical_transformer, categorical_features)
         ]
     )
-
-    # 应用预处理
     X_preprocessed = preprocessor.fit_transform(filtered_df)
 
     # 执行K-Means聚类
-    kmeans = KMeans(n_clusters=3, n_init=10, random_state=42)  # 选择聚类数量为3
+    kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42)  # 使用滑块的值
     kmeans.fit(X_preprocessed)
     filtered_df['cluster'] = kmeans.labels_
 
-    cluster_summary = generate_cluster_summary_table(filtered_df, numeric_features, categorical_features)  # 生成聚类总结的DataFrame
+    # 生成聚类总结的DataFrame
+    cluster_summary = generate_cluster_summary_table(filtered_df, numeric_features, categorical_features)
 
     # 将DataFrame转换为Dash DataTable
     table = dash_table.DataTable(
@@ -397,8 +407,19 @@ def update_cluster_analysis(contents, start_date, end_date):
         columns=[{'name': i, 'id': i} for i in cluster_summary.columns]
     )
 
-    # 返回表格和更新的样式来展示容器
-    return table, {'display': 'block'}   
+    # 计算WCSS
+    wcss = []
+    for i in range(1, 11):  # 假设聚类数从1到10
+        kmeans = KMeans(n_clusters=i, init='k-means++', max_iter=300, n_init=10, random_state=0)
+        kmeans.fit(X_preprocessed)
+        wcss.append(kmeans.inertia_)
+
+    # 绘制Elbow图
+    elbow_fig = go.Figure(data=go.Scatter(x=list(range(1, 11)), y=wcss, mode='lines+markers'))
+    elbow_fig.update_layout(title='Elbow Method', xaxis_title='Number of Clusters', yaxis_title='WCSS')
+
+    # 返回表格、样式和Elbow图
+    return table, {'display': 'block'}, elbow_fig 
     
        
     
