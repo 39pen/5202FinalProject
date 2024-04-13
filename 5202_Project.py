@@ -109,28 +109,19 @@ app.layout = html.Div(children=[
 
             # Store component for state management
             dcc.Store(id='store-searched-game', storage_type='session'),
-        ]),
 
-        dcc.Tab(label='Time Series Analysis', children=[
             # 新增：用于显示时间序列图表的container
             html.Div(id='time-series-chart', style={'width': '100%', 'marginTop': '20px'}),
         ]),
 
-        dcc.Tab(label='Other Analysis', children=[    
-            #新增：聚类分析表格container
-            dcc.Graph(id='elbow-method-chart'),
-            dcc.Slider(
-            id='cluster-slider',
-            min=1,
-            max=10,
-            value=4,  # 默认值为3
-            marks={i: str(i) for i in range(1, 11)},
-            step=1
-            ),
-            html.Div(id='cluster-analysis-container', style={'display': 'none'}),
+        dcc.Tab(label='Relationship', children=[
             #新增relationship的表格
             html.Div(id='reviews-rating-chart', style={'width': '100%', 'marginTop': '20px'}),
             html.Div(id='plays-playing-chart', style={'width': '100%', 'marginTop': '20px'}),
+            dcc.Graph(id='rating-comparison-chart'),
+        ]),
+
+        dcc.Tab(label='Feedback', children=[
             dcc.Graph(id='genre-distribution-chart'),
             html.Div(id='top-games-by-plays'),
             html.Div(id='genre-rating-chart', style={'width': '100%', 'marginTop': '20px'}),
@@ -138,8 +129,8 @@ app.layout = html.Div(children=[
             html.Div(id='output-progress'),
             dcc.Graph(id='platform-distribution-pie'),
             dcc.Graph(id='developer-distribution-pie'),
-            dcc.Graph(id='rating-comparison-chart'),
         ]),
+            
     ]),
 
 ], style={'backgroundColor': '#ADD8E6'})
@@ -329,97 +320,6 @@ def search_game(n_clicks_search, n_clicks_close, search_value, content):
     # Default return (e.g., initial load)
     return {'display': 'none'}, []
 
-
-
-#新增：cluster analysis部分
-def generate_cluster_summary_table(df, numeric_features, categorical_features):
-    # 首先，计算数值型特征的平均值
-    numeric_summary = df.groupby('cluster')[numeric_features].mean().reset_index()
-
-    # 对数值型特征进行四舍五入，保留两位小数
-    numeric_summary[numeric_features] = numeric_summary[numeric_features].round(2)
-    
-    # 接下来，找出每个聚类中最常见的分类特征的值
-    for feature in categorical_features:
-        # 对每个聚类，计算每个分类特征的众数，并创建一个新的列来存储这些值
-        mode_series = df.groupby('cluster')[feature].agg(lambda x: x.mode()[0] if not x.mode().empty else 'Unknown').rename(f'most_common_{feature}')
-        # 因为mode_series是Series，所以使用reset_index来转换为DataFrame，以便进行merge操作
-        mode_df = mode_series.reset_index()
-        numeric_summary = numeric_summary.merge(mode_df, on='cluster')
-
-    return numeric_summary
-
-
-@app.callback(
-    [Output('cluster-analysis-container', 'children'),
-     Output('cluster-analysis-container', 'style'),
-     Output('elbow-method-chart', 'figure')],
-    [Input('upload-data', 'contents'),
-     Input('date-picker-range', 'start_date'),
-     Input('date-picker-range', 'end_date'),
-     Input('cluster-slider', 'value')]  # 新增输入项
-)
-def update_cluster_analysis(contents, start_date, end_date, n_clusters): 
-    if contents is None:
-        raise PreventUpdate
-
-    # 解析上传的文件内容
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-
-    # 转换日期并过滤数据
-    df['date'] = pd.to_datetime(df['date'])
-    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))].copy()
-    
-    numeric_features = ['rating', 'reviews', 'plays']
-    numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
-        ('scaler', StandardScaler())
-    ])
-
-    categorical_features = ['platform', 'genre', 'developer']
-    categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore'))
-    ])
-    
-    # 应用预处理步骤
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', numeric_transformer, numeric_features),
-            ('cat', categorical_transformer, categorical_features)
-        ]
-    )
-    X_preprocessed = preprocessor.fit_transform(filtered_df)
-
-    # 执行K-Means聚类
-    kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42)  # 使用滑块的值
-    kmeans.fit(X_preprocessed)
-    filtered_df['cluster'] = kmeans.labels_
-
-    # 生成聚类总结的DataFrame
-    cluster_summary = generate_cluster_summary_table(filtered_df, numeric_features, categorical_features)
-
-    # 将DataFrame转换为Dash DataTable
-    table = dash_table.DataTable(
-        data=cluster_summary.to_dict('records'),
-        columns=[{'name': i, 'id': i} for i in cluster_summary.columns]
-    )
-
-    # 计算WCSS
-    wcss = []
-    for i in range(1, 11):  # 假设聚类数从1到10
-        kmeans = KMeans(n_clusters=i, init='k-means++', max_iter=300, n_init=10, random_state=0)
-        kmeans.fit(X_preprocessed)
-        wcss.append(kmeans.inertia_)
-
-    # 绘制Elbow图
-    elbow_fig = go.Figure(data=go.Scatter(x=list(range(1, 11)), y=wcss, mode='lines+markers'))
-    elbow_fig.update_layout(title='Elbow Method', xaxis_title='Number of Clusters', yaxis_title='WCSS')
-
-    # 返回表格、样式和Elbow图
-    return table, {'display': 'block'}, elbow_fig 
     
        
     
@@ -603,7 +503,7 @@ def update_genre_reviews_chart(start_date, end_date, contents):
     genre_avg_reviews['color'] = genre_avg_reviews['genre'].apply(lambda x: 'Top 3' if x in top_genres_reviews.values else 'Other')
 
     # 生成条形图，并使用颜色列来定义每个条形的颜色
-    fig = px.bar(genre_avg_reviews, x='genre', y='average_reviews', 
+    fig = px.bar(genre_avg_reviews, x='genre', y='average_reviews',
                  title='Average Reviews by Genre in Selected Date Range'
                  )
 
@@ -801,4 +701,3 @@ def update_rating_comparison_chart(start_date, end_date, contents):
 
 if __name__ == '__main__':
     app.run_server(debug=True)
-    
