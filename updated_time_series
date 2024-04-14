@@ -25,6 +25,7 @@ from dash.exceptions import PreventUpdate
 from dash import dash_table
 from dash.dash_table.Format import Format 
 import plotly.graph_objs as go
+from dash import no_update
 
 app = dash.Dash(__name__)
 
@@ -141,13 +142,29 @@ app.layout = html.Div(children=[
         ]),
 
         dcc.Tab(label='Feedback', children=[
+            dcc.Dropdown(
+                id='angle-selector',
+                options=[
+                    {'label': 'Genre', 'value': 'genre'},
+                    {'label': 'Platform', 'value': 'platform'}
+                ],
+                value='genre'  # 默认选项是genre
+            ),
+            dcc.Dropdown(
+                id='metric-selector',
+                options=[
+                    {'label': 'Rating', 'value': 'rating'},
+                    {'label': 'Playing', 'value': 'playing'},
+                    {'label': 'Reviews', 'value': 'reviews'}
+                ],
+                value='Rating'  # 默认选项是genre
+            ),
             dcc.Graph(id='genre-distribution-chart'),
             html.Div(id='top-games-by-plays'),
             html.Div(id='genre-rating-chart', style={'width': '100%', 'marginTop': '20px'}),
             html.Div(id='genre-reviews-chart', style={'width': '100%', 'marginTop': '20px'}),
             html.Div(id='output-progress'),
             dcc.Graph(id='platform-distribution-pie'),
-            dcc.Graph(id='developer-distribution-pie'),
         ]),
             
     ]),
@@ -424,16 +441,54 @@ def update_plays_playing_chart(start_date, end_date, contents):
     return graph_html
 
 
-
 @app.callback(
-    Output('genre-distribution-chart', 'figure'),
+    Output('rating-comparison-chart', 'figure'),
     [Input('date-picker-range', 'start_date'),
      Input('date-picker-range', 'end_date'),
      Input('upload-data', 'contents')]
 )
-def update_genre_distribution_chart(start_date, end_date, contents):
+def update_rating_comparison_chart(start_date, end_date, contents):
     if contents is None:
         raise PreventUpdate
+
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)].copy()
+
+    # Identify the developer category based on inclusion of Sony, Microsoft, or Nintendo
+    conditions = [
+        filtered_df['developer'].str.contains('Sony', case=False, na=False),
+        filtered_df['developer'].str.contains('Microsoft', case=False, na=False),
+        filtered_df['developer'].str.contains('Nintendo', case=False, na=False)
+    ]
+    choices = ['Sony', 'Microsoft', 'Nintendo']
+    filtered_df['Developer Category'] = np.select(conditions, choices, default='Others').copy()
+
+    # Plotting the box plot
+    fig = px.box(filtered_df, x='Developer Category', y='rating', title='Rating Distribution by Developer Category')
+
+    return fig
+
+
+
+@app.callback(
+    [Output('genre-distribution-chart', 'figure'),  # 图表数据
+     Output('genre-distribution-chart', 'style')],
+    [Input('angle-selector', 'value'),
+     Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_genre_distribution_chart(angle, start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+
+    # 如果当前未选择 'genre'，隐藏图表
+    if angle != 'genre':
+        return {}, {'display': 'none'}
     
     # 解析上传的文件
     content_type, content_string = contents.split(',')
@@ -457,19 +512,21 @@ def update_genre_distribution_chart(start_date, end_date, contents):
     # 使用 Plotly Express 或 Graph Objects 构造图表
     fig = px.bar(genre_counts, x="genre", y="count", title="Genre Distribution")
     
-    return fig  # 直接返回构造好的图表对象
+    return fig, {'display': 'block'}  # 直接返回构造好的图表对象
 
 
 
 @app.callback(
     Output('genre-rating-chart', 'children'),  # 确保你的布局中有一个与此ID相对应的组件
-    [Input('date-picker-range', 'start_date'),
+    [Input('angle-selector', 'value'),
+     Input('metric-selector', 'value'),
+     Input('date-picker-range', 'start_date'),
      Input('date-picker-range', 'end_date'),
      Input('upload-data', 'contents')]
 )
-def update_genre_rating_chart(start_date, end_date, contents):
-    if contents is None:
-        raise PreventUpdate
+def update_genre_rating_chart(angle, metric, start_date, end_date, contents):
+    if contents is None or angle != 'genre' or metric != 'rating':
+        return no_update  # 不更新任何内容
 
     # 解析上传的文件
     content_type, content_string = contents.split(',')
@@ -617,14 +674,20 @@ def update_output(contents, start_date, end_date):
 
 
 @app.callback(
-    Output('platform-distribution-pie', 'figure'),  # 注意更改输出组件ID
-    [Input('date-picker-range', 'start_date'),
+    [Output('platform-distribution-pie', 'figure'),  # 图表数据
+     Output('platform-distribution-pie', 'style')],  # 注意更改输出组件ID
+    [Input('angle-selector', 'value'),
+     Input('date-picker-range', 'start_date'),
      Input('date-picker-range', 'end_date'),
      Input('upload-data', 'contents')]
 )
-def update_platform_distribution_pie(start_date, end_date, contents):
+def update_platform_distribution_pie(angle, start_date, end_date, contents):
     if contents is None:
         raise PreventUpdate
+
+    # 如果当前未选择 'genre'，隐藏图表
+    if angle != 'platform':
+        return {}, {'display': 'none'}
     
     # 解析上传的文件
     content_type, content_string = contents.split(',')
@@ -652,7 +715,8 @@ def update_platform_distribution_pie(start_date, end_date, contents):
     # 使用 Plotly Express 构造饼状图
     fig = px.pie(platform_counts, names="platform", values="count", title="Platform Distribution within Selected Date Range")
 
-    return fig  # 直接返回构造好的图表对象
+    return fig, {'display': 'block'}  # 直接返回构造好的图表对象
+
 
 
 
@@ -664,77 +728,10 @@ from dash import Dash, html, dcc, Input, Output, callback  # 根据您的Dash版
 
 # 假设以下是您Dash应用的一部分
 
-@app.callback(
-    Output('developer-distribution-pie', 'figure'),  # 修改输出组件ID为developer分布图
-    [Input('date-picker-range', 'start_date'),
-     Input('date-picker-range', 'end_date'),
-     Input('upload-data', 'contents')]
-)
-def update_developer_distribution_pie(start_date, end_date, contents):
-    if contents is None:
-        raise PreventUpdate
-    
-    # 解析上传的文件
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-
-    # 转换日期格式并按照指定日期范围过滤数据
-    df['date'] = pd.to_datetime(df['date'])
-    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))].copy()
-
-    # 检查 'developer' 列中的字符串是否包含指定的开发者名字
-    conditions = [
-        filtered_df['developer'].str.contains('Sony', case=False, na=False),
-        filtered_df['developer'].str.contains('Microsoft', case=False, na=False),
-        filtered_df['developer'].str.contains('Nintendo', case=False, na=False)
-    ]
-    choices = ['Sony', 'Microsoft', 'Nintendo']
-
-    # 应用条件
-    filtered_df['developer_category'] = np.select(conditions, choices, default='others').copy()
-
-    # 按 'developer_category' 分组并计算每个类别的游戏数量
-    developer_counts = filtered_df['developer_category'].value_counts().reset_index()
-    developer_counts.columns = ['developer', 'count']
-    
-    # 使用 Plotly Express 构造饼状图
-    fig = px.pie(developer_counts, names="developer", values="count", title="Developer Distribution within Selected Date Range")
-
-    return fig
 
 
 
-@app.callback(
-    Output('rating-comparison-chart', 'figure'),
-    [Input('date-picker-range', 'start_date'),
-     Input('date-picker-range', 'end_date'),
-     Input('upload-data', 'contents')]
-)
-def update_rating_comparison_chart(start_date, end_date, contents):
-    if contents is None:
-        raise PreventUpdate
 
-    content_type, content_string = contents.split(',')
-    decoded = base64.b64decode(content_string)
-    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-
-    df['date'] = pd.to_datetime(df['date'])
-    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)].copy()
-
-    # Identify the developer category based on inclusion of Sony, Microsoft, or Nintendo
-    conditions = [
-        filtered_df['developer'].str.contains('Sony', case=False, na=False),
-        filtered_df['developer'].str.contains('Microsoft', case=False, na=False),
-        filtered_df['developer'].str.contains('Nintendo', case=False, na=False)
-    ]
-    choices = ['Sony', 'Microsoft', 'Nintendo']
-    filtered_df['Developer Category'] = np.select(conditions, choices, default='Others').copy()
-
-    # Plotting the box plot
-    fig = px.box(filtered_df, x='Developer Category', y='rating', title='Rating Distribution by Developer Category')
-
-    return fig
 
 
 if __name__ == '__main__':
