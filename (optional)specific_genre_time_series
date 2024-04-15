@@ -136,8 +136,10 @@ app.layout = html.Div(children=[
                 clearable=False
             ),
             
-            # 新增Search bar for genre specific analysis
+            # 新增：
+            # 用于控制搜索栏显示的Div
             html.Div(
+                id='genre-search-controls',
                 style={'padding': '20px', 'textAlign': 'center'},
                 children=[
                     dcc.Input(id='genre-search-bar', type='text', placeholder='Enter a genre (e.g., Adventure)'),
@@ -394,7 +396,16 @@ def generate_chart(chart_selection, resampled, resample_code, title):
     return dcc.Graph(figure=fig)
 
 
-
+# 回调来控制搜索栏和按钮的可见性
+@app.callback(
+    Output('genre-search-controls', 'style'),
+    [Input('time-series-selection', 'value')]
+)
+def toggle_genre_search_visibility(selected_chart):
+    if selected_chart == 'unique_genres':
+        return {'display': 'none'}
+    else:
+        return {'display': 'block'}  # 或其他适合的样式
 
 
 
