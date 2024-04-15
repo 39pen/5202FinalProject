@@ -142,7 +142,7 @@ app.layout = html.Div(children=[
                 id='genre-search-controls',
                 style={'padding': '20px', 'textAlign': 'center'},
                 children=[
-                    dcc.Input(id='genre-search-bar', type='text', placeholder='Enter a genre (e.g., Adventure)'),
+                    dcc.Input(id='genre-search-bar', type='text', placeholder='Enter a genre'),
                     html.Button('Show Genre Data', id='genre-search-button', n_clicks=0),
                 ]
             ),
