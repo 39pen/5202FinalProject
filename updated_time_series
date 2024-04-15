@@ -45,6 +45,33 @@ app.layout = html.Div(children=[
         multiple=False # Restrict to single file upload
     ),
 
+    # Search bar
+    html.Div(
+        style={'display': 'flex', 'justifyContent': 'flex-end', 'marginRight': '10px'},
+        children=[
+            dcc.Input(id='search-bar', type='text', placeholder='Search for a game...'),
+            html.Button(id='search-button', n_clicks=0, children='Search'),
+        ]
+    ),
+
+    # Custom modal (hidden by default)
+    html.Div(id='modal-game-info', style={'display': 'none'}, children=[
+        html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'border-radius': '5px', 'position': 'fixed', 'top': '20%', 'left': '50%', 'transform': 'translate(-50%, -50%)', 'zIndex': '100'}, children=[
+            html.H4("Game Details", id='modal-title'),
+            html.Div(id='game-info'),
+            html.Button('Close', id='modal-close', n_clicks=0),
+        ]),
+        # Overlay to capture clicks outside the modal
+        html.Div(style={'position': 'fixed', 'top': 0, 'left': 0, 'height': '100%', 'width': '100%', 'backgroundColor': 'rgba(0,0,0,0.5)'})
+    ]),
+
+    # Store component for state management
+    dcc.Store(id='store-searched-game', storage_type='session'),
+
+    # Text asks user to upload file
+    html.Div(id='data-summary-text',
+             style={'width': '100%'}),
+
     dcc.DatePickerRange(
         id='date-picker-range',
         display_format='YYYY-MM-DD',
@@ -53,9 +80,6 @@ app.layout = html.Div(children=[
         style={'margin': '20px 0'}
     ),
     
-    # Text to display summary
-    html.Div(id='data-summary-text',
-             style={'width': '100%'}),
 
     dcc.Tabs(id="tabs", children = [
         
@@ -93,25 +117,10 @@ app.layout = html.Div(children=[
                 ], className='metric-container')
             ]),
 
-            # Search bar
-            dcc.Input(id='search-bar', type='text', placeholder='Search for a game...'),
-            html.Button(id='search-button', n_clicks=0, children='Search'),
-
-            # Custom modal (hidden by default)
-            html.Div(id='modal-game-info', style={'display': 'none'}, children=[
-                html.Div(style={'backgroundColor': 'white', 'padding': '20px', 'border-radius': '5px', 'position': 'fixed', 'top': '20%', 'left': '50%', 'transform': 'translate(-50%, -50%)', 'zIndex': '100'}, children=[
-                    html.H4("Game Details", id='modal-title'),
-                    html.Div(id='game-info'),
-                    html.Button('Close', id='modal-close', n_clicks=0),
-                ]),
-                # Overlay to capture clicks outside the modal
-                html.Div(style={'position': 'fixed', 'top': 0, 'left': 0, 'height': '100%', 'width': '100%', 'backgroundColor': 'rgba(0,0,0,0.5)'})
-            ]),
-
-            # Store component for state management
-            dcc.Store(id='store-searched-game', storage_type='session'),
-
-            
+            html.Div(
+                style={'marginTop': '40px', 'textAlign': 'center'},
+                children=[html.H2("Time Series Analysis")],
+            ),
             
             
             # 新增：filter bar
@@ -126,8 +135,6 @@ app.layout = html.Div(children=[
                 value='num_games',  # 默认显示第一个图表
                 clearable=False
             ),
-
-            
             
             
             # 用于显示时间序列图表的container
@@ -207,7 +214,7 @@ def update_summary(content, filename, start_date, end_date, chart_selection):
     decoded = io.StringIO(base64.b64decode(content_string).decode('utf-8'))
     df = pd.read_csv(decoded)
     # Give a summary of the file
-    summary_text = f'{filename} contains {len(df)} rows.'
+    summary_text = ''
 
     # Filter according to date selection
     df['date'] = pd.to_datetime(df['date'], errors='coerce')
@@ -354,13 +361,13 @@ def search_game(n_clicks_search, n_clicks_close, search_value, content):
             game_info = match_df.iloc[0][['name', 'date', 'genre', 'developer', 'platform', 'rating', 'wishlists', 'description']].to_dict()
             game_details = [
                 html.H4(game_info.get('name', 'No Name')),
-                html.P(f"Date: {game_info.get('date', 'No available information')}"),
-                html.P(f"Genre: {game_info.get('genre', 'No available information')}"),
-                html.P(f"Developer: {game_info.get('developer', 'No available information')}"),
-                html.P(f"Platform: {game_info.get('platform', 'No available information')}"),
-                html.P(f"Rating: {game_info.get('rating', 'No available information')}"),
-                html.P(f"Wishlists: {game_info.get('wishlists', 'No available information')}"),
-                html.P(f"Description: {game_info.get('description', 'No description available.')}"),
+                html.P(f"Date: {game_info['date'] if pd.notna(game_info['date']) else 'No information available'}"),
+                html.P(f"Genre: {game_info['genre'] if pd.notna(game_info['genre']) else 'No information available'}"),
+                html.P(f"Developer: {game_info['developer'] if pd.notna(game_info['developer']) else 'No information available'}"),
+                html.P(f"Platform: {game_info['platform'] if pd.notna(game_info['platform']) else 'No information available'}"),
+                html.P(f"Rating: {game_info['rating'] if pd.notna(game_info['rating']) else 'No information available'}"),
+                html.P(f"Wishlists: {game_info['wishlists'] if pd.notna(game_info['wishlists']) else 'No information available'}"),
+                html.P(f"Description: {game_info['description'] if pd.notna(game_info['description']) else 'No information available'}"),
             ]
             return {'display': 'block'}, game_details  # Show modal with details
         else:
