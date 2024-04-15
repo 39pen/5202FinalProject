@@ -343,7 +343,7 @@ def update_genre_charts(n_clicks, chart_selection, start_date, end_date, genre, 
     df = pd.read_csv(decoded)
 
     df['date'] = pd.to_datetime(df['date'], errors='coerce')
-    df['genre'] = df['genre'].fillna('').str.split(',').apply(lambda x: [i.strip().lower() for i in x])
+    df['genre'] = df['genre'].apply(lambda x: [i.strip() for i in x] if isinstance(x, list) else x) 
     df = df.explode('genre')
 
     filtered_df = df[
