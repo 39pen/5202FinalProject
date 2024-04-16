@@ -1,0 +1,1261 @@
+import dash
+from dash import dcc, callback, html, State, callback_context
+from dash.dependencies import Input, Output
+import dash_bootstrap_components as dbc
+import pandas as pd
+import io
+import base64
+from datetime import datetime
+import tabulate
+import plotly.express as px
+import plotly.graph_objs as go
+
+
+
+#新增：cluster analysis所需要的安装包
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.cluster import KMeans
+from dash.exceptions import PreventUpdate
+from dash import dash_table
+from dash.dash_table.Format import Format 
+import plotly.graph_objs as go
+from dash import no_update
+
+card_content_a = [
+    dbc.CardHeader(
+        [
+            html.Div([
+                html.H1(id="num-games"),
+            ], className="text-center",
+                style={"display": "flex", "justify-content": "center", "align-items": "center"}),
+        ],
+    ),
+    dbc.CardFooter(
+        [
+            html.Div([html.I(className="bi bi-controller"), "Number of Games"], className="text-center"),
+        ]
+    ),
+]
+
+card_content_b = [
+    dbc.CardBody(
+        [
+            html.H1(id="num-genres", className="text-center"),
+        ],
+    ),
+    dbc.CardFooter(
+        [
+            html.Div([html.I(className="bi bi-tags-fill"), "Number of Genres"], className="text-center"),
+        ]
+    ),
+]
+
+card_content_c = [
+    dbc.CardHeader(
+        [
+            html.Div([
+                html.H1(id="unique-developers"),
+            ], className="text-center",
+                style={"display": "flex", "justify-content": "center", "align-items": "center"}),
+        ],
+    ),
+    dbc.CardFooter(
+        [
+            html.Div([html.I(className="bi bi-code-square"), "Number of Developers"], className="text-center"),
+        ]
+    ),
+]
+
+card_content_d = [
+    dbc.CardHeader(
+        [
+            html.Div([html.I(className="bi bi-collection-play-fill"), "Average Plays"], className="text-center"),
+        ]
+    ),
+    dbc.CardBody(
+        [
+            html.Div([
+                html.H1(id="avg-plays"),
+            ], className="text-center",
+                style={"display": "flex", "justify-content": "center", "align-items": "center"}),
+        ],
+    ),
+]
+card_content_e = [
+    dbc.CardBody(
+        [
+            html.Div([
+                html.H1(id="avg-rating", style={'color': 'white'}),
+            ], className="text-center",
+                style={"display": "flex", "justify-content": "center", "align-items": "center"}),
+        ],
+    ),
+    dbc.CardFooter(
+        [
+            html.Div([html.I(className="bi bi-star"), "Average Rating"], className="text-center"),
+        ]
+    ),
+]
+card_content_f = [
+    dbc.CardHeader(
+        [
+            html.Div([html.I(className="bi bi-chat-left-text-fill"), "Number of Descriptions"], className="text-center"),
+        ]
+    ),
+    dbc.CardBody(
+        [
+            html.Div([
+                html.H1(id="num-description"),
+            ], className="text-center",
+                style={"display": "flex", "justify-content": "center", "align-items": "center"}),
+        ],
+    ),
+]
+
+# Define the cards of Feedback 
+# Define the card style with rounded corners and shadows
+card_style_a = {
+    'backgroundColor': 'rgba(94, 114, 228, 0.75)',  # Semi-transparent blue background
+    'boxShadow': '0 4px 8px rgba(0, 0, 0, 0.15)',  # Subtle shadow
+    'borderRadius': '0.5rem',  # Rounded corners
+    'marginBottom': '20px',  # Space between cards
+    'overflow': 'hidden',  # Prevents content from spilling out
+    'display': 'flex',  # Enables flexbox
+    'flexDirection': 'column',  # Stack children vertically
+    'justifyContent': 'center',  # Center vertically
+    'alignItems': 'center'  # Center horizontally
+}
+
+card_style_b = {
+    'backgroundColor': 'rgba(94, 114, 228, 0.25)',  # Semi-transparent blue background
+    'boxShadow': '0 4px 8px rgba(0, 0, 0, 0.15)',  # Subtle shadow
+    'borderRadius': '0.5rem',  # Rounded corners
+    'marginBottom': '20px',  # Space between cards
+    'overflow': 'hidden',  # Prevents content from spilling out
+    'display': 'flex',  # Enables flexbox
+    'flexDirection': 'column',  # Stack children vertically
+    'justifyContent': 'center',  # Center vertically
+    'alignItems': 'center'  # Center horizontally
+}
+
+
+# First card with consistent style
+card_a = dbc.Card([
+    dbc.CardBody([
+        html.H1(id="unique-developers-output", className="text-center", style={'marginTop':'10px'})
+    ])
+], style=card_style_a)
+
+# Second card with consistent style
+card_b = dbc.Card([
+    dbc.CardBody([
+        html.H1(id="top-developer-output", className="text-center", style={'marginTop':'10px'})
+    ])
+], style=card_style_b)
+
+
+filter_bar = html.Div(
+    [
+        dbc.Select(
+            id='time-series-selection',
+            options=[
+                {'label': 'Number of Games Released', 'value': 'num_games'},
+                {'label': 'Number of Unique Game Genres', 'value': 'unique_genres'},
+                {'label': 'Total Plays', 'value': 'total_plays'},
+                {'label': 'Average Rating', 'value': 'avg_rating'},
+            ],
+            value='num_games',  # Set the default value
+            className='my-2',  # Maintain the margin
+            html_size="lg",  # Make the select larger to match other inputs
+        )
+    ],
+    className="mb-4"  # Add a bottom margin
+)
+
+filter_bar_angle = dbc.CardGroup(
+    [
+        dbc.Label("Select Angle:", html_for="dropdown"),
+        dbc.Select(
+            id='angle-selector',
+            options=[
+                {'label': 'Genre', 'value': 'genre'},
+                {'label': 'Platform', 'value': 'platform'}
+            ],
+            value='genre',  # Default selection
+            className='mb-3',  # Margin bottom for spacing
+        ),
+    ]
+)
+
+filter_bar_metric = dbc.CardGroup(
+    [
+        dbc.Label("Select Metric:", html_for="dropdown"),
+        dbc.Select(
+            id='metric-selector',
+            options=[
+                {'label': 'Rating', 'value': 'rating'},
+                {'label': 'Plays', 'value': 'plays'},
+                {'label': 'Reviews', 'value': 'reviews'}
+            ],
+            value='rating',  # Default selection
+            className='mb-3',  # Margin bottom for spacing
+        ),
+    ]
+)
+
+layout_section = dbc.Row(
+    [
+        dbc.Col(filter_bar_angle, width=6),
+        dbc.Col(filter_bar_metric, width=6)
+    ],
+    className='my-3'  # Margin top and bottom for the entire row
+)
+
+feedback_tab_content = [
+    layout_section,  # Your existing filter bar or other setup content
+
+    # Single row for the graphs and the details
+    dbc.Row([
+        # Column for the first graph and its related information
+        dbc.Col([
+            dcc.Graph(
+                id='distribution-bar-chart', 
+                style={
+                    'minWidth': '100%',
+                    'boxShadow': '0 2px 4px rgba(0, 0, 0, 0.1)',  # Adding light shadow for card effect
+                    'padding': '20px',  # Optional: adds space inside the div container for aesthetic purposes
+                    'background': 'white'  # Ensuring the background is white for consistency
+                }
+            ),
+            html.Hr(),  # Horizontal line for visual separation
+            dbc.Col(card_a), 
+            dbc.Col(card_b)
+        ], width=4, className='pe-2'),  # This takes up a third of the row, adding padding on the right for separation
+
+        # Column for the second graph
+        dbc.Col([
+            dcc.Graph(
+                id='distribution-metrics-chart',
+                style={
+                    'minWidth': '100%',
+                    'boxShadow': '0 2px 4px rgba(0, 0, 0, 0.1)',  # Adding light shadow for card effect
+                    'padding': '10px',  # Optional: adds space inside the div container for aesthetic purposes
+                    'background': 'white'  # Ensuring the background is white for consistency
+                }
+            ),
+            html.Hr(),  # Horizontal line for visual separation
+            # Use a Card to enclose the metrics output
+            dbc.Col(id='top-developer-metric-output')
+        ], width=4, className='pe-2'),  # This takes up a third of the row, add
+
+        # Column for detailed textual information
+        dbc.Col(html.Div([
+            html.Div([
+                # Merged content
+                html.Div(id='top-details', style={'padding': '5px'}),
+            ], style={
+                'overflow-y': 'auto',  # Enable vertical scrolling within this div
+                'height': '765px'  # Set to match graph height
+            })
+        ], style={
+            'height': '785px',  # Same height as the graph
+            'boxShadow': '0 2px 4px rgba(0, 0, 0, 0.1)',  # Adding shadow
+            'borderRadius': '1rem',  # Rounded corners
+            'padding': '10px',
+            'backgroundColor': 'rgba(94, 114, 228, 0.25)'  # Primary color with 50% transparency
+        }), width=4, className='g-0')  # Adjust width to match combined width of the left columns
+    ], className='g-0 mx-0')  # Use 'g-0' to remove gutters completely, 'mx-0' to remove horizontal margins
+]
+
+
+
+
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP])
+
+app.layout = dbc.Container(children=[
+    # 包裹在蓝色背景中的部分
+    html.Div([
+        html.H1('Games Dashboard', className='text-white', style={'textAlign': 'center'}),
+        
+        # 新增：Upload提示和Upload按钮的容器
+        html.Div(
+            style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'backgroundColor': '#5e72e4', 'color': 'white'},
+            children=[
+        # 左侧：Upload提示和Upload按钮的容器
+                html.Div(
+                    style={'display': 'flex', 'alignItems': 'center'},
+                    children=[
+                        # Upload button
+                        dcc.Upload(
+                            id='upload-data',
+                            children=dbc.Button('Choose File', color="primary", className='me-2 shadow-sm', style={'fontWeight': 'bold', 'marginTop': '10px'}),
+                            multiple=False  # Restrict to single file upload
+                        ),
+                        # Upload提示文字
+                        html.Div(id='data-summary-text', style={'fontWeight': 'bold', 'marginLeft': '15px', 'marginTop': '-5px'})
+                    ]
+                ),
+
+                html.Div(
+                    style={'display': 'flex', 'alignItems': 'center'},
+                    children=[
+
+                        # 中间：文本提示选择时间段
+                        html.Div(
+                            style={'fontWeight': 'bold', 'marginRight': '15px', 'marginTop': '-5px'},
+                            children="Select the time period you want to analyse: "
+                        ),
+                        
+                        # 右侧：日期选择器
+                        dcc.DatePickerRange(
+                            id='date-picker-range',
+                            display_format='YYYY-MM-DD',
+                            start_date='1900-01-01',  # 设置默认开始日期为 1900-01-01
+                            end_date=datetime.today().strftime('%Y-%m-%d'),  # 设置默认结束日期为今天的日期
+                            style={'borderRadius': '5px', 'border': 'none'}
+                        )
+                    ]
+                )
+    ]
+),
+
+        # Search bar
+        html.Div(
+            style={'display': 'flex', 'justifyContent': 'flex-start', 'marginRight': '10px', 'marginTop': '20px', 'flexGrow': '1'},
+            children=[
+                dbc.Input(id='search-bar', type='text', placeholder='Search for a game...', className='me-1', style={'width': '1250px', 'height': '50px'}),
+                html.Div(  # 内部容器，用于更灵活地控制搜索按钮的位置
+                    style={'marginLeft': '20px', 'alignSelf': 'flex-start'},  # 控制内部按钮的左边距和垂直对齐
+                    children=[
+                        dbc.Button('Search', id='search-button', n_clicks=0, color="primary", className='me-2 shadow-sm', style={'fontWeight': 'bold', 'marginTop': '3px'}),
+                    ])]
+        ),
+    ], style={'backgroundColor': '#5e72e4', 'padding': '20px'}),
+
+    # Custom modal (hidden by default)
+    html.Div(
+        id='modal-game-info',
+        style={'display': 'none'},  # 控制显示隐藏
+        children=[
+            # Modal content container
+            html.Div(
+                style={
+                    'backgroundColor': 'white',
+                    'padding': '20px',
+                    'borderRadius': '10px',
+                    'position': 'fixed',
+                    'top': '50%', 'left': '50%',
+                    'transform': 'translate(-50%, -50%)',
+                    'zIndex': '1040',  # 确保modal内容在遮罩之上
+                    'width': '80%',  # 设置弹窗宽度
+                    'maxWidth': '600px'  # 设置弹窗的最大宽度
+                },
+                children=[
+                    html.H4("Game Details", id='modal-title'),
+                    html.Div(id='game-info'),
+                    dbc.Button('Close', id='modal-close', n_clicks=0, color="secondary"),
+                ]
+            ),
+            # Overlay to capture clicks outside the modal, ensuring it covers the entire viewport
+            html.Div(
+                style={
+                    'position': 'fixed',
+                    'top': 0, 'left': 0,
+                    'height': '100vh', 'width': '100vw',
+                    'backgroundColor': 'rgba(0,0,0,0.5)',
+                    'zIndex': '1030'  # 确保遮罩在内容之下，但高于其他所有内容
+                }
+            )
+        ]
+    ),
+
+    # Store component for state management
+    dcc.Store(id='store-searched-game', storage_type='session'),
+
+    # 主要内容区域，背景为白色
+    html.Div([
+        dcc.Tabs(id="tabs", children=[
+            dcc.Tab(label='Overview', children=[  
+                html.Div([  # Container for cards with padding
+                    dbc.Row(
+                        [
+                            dbc.Col(dbc.Card(card_content_a, color="primary", inverse=True)),
+                            dbc.Col(dbc.Card(card_content_b, color="primary", outline=True)),
+                            dbc.Col(dbc.Card(card_content_c, color="primary", inverse=True)),
+                        ],
+                        className="mb-4",  # Margin bottom for spacing between rows
+                    ),
+                    dbc.Row(
+                        [
+                            dbc.Col(dbc.Card(card_content_d, color="primary", outline=True)),
+                            dbc.Col(dbc.Card(card_content_e, color="primary", inverse=True)),
+                            dbc.Col(dbc.Card(card_content_f, color="primary", outline=True)),
+                        ],
+                        className="mb-4",  # Increase margin bottom if needed
+                    ),
+                ], style={'paddingTop': '30px'}),
+
+                dbc.Row(
+                    style={'marginTop': '30px', 'textAlign': 'center'},
+                    children=[html.H2("Time Series Analysis")],
+                ),
+
+                # 新增：filter bar
+                filter_bar,
+
+                # 新增搜索栏，风格统一
+                html.Div(
+                        id='genre-search-controls',
+                        style={
+                            'display': 'flex',
+                            'alignItems': 'center',
+                            'justifyContent': 'flex-start',
+                            'marginRight': '10px',
+                            'marginLeft': '20px'
+                        },
+                        children=[
+                            dbc.Input(
+                                id='genre-search-bar',
+                                type='text',
+                                placeholder='Enter a genre',
+                                className='me-2',
+                                style={
+                                    'flexGrow': '1',  # 允许输入框增长填满额外空间
+                                    'minWidth': '0',  # 防止输入框在缩小时被挤出容器 
+                                    'height': '40px',
+                                    'width' :'85%'
+                                }
+                            ),
+                            dbc.Button(
+                                'Show Genre Data',
+                                id='genre-search-button',
+                                n_clicks=0,
+                                color="primary",
+                                className='ms-2 shadow-sm',
+                                style={'fontWeight': 'bold','marginRight':'10px', 'marginTop': '15px'}
+                            )
+                        ]
+                    ),
+                
+                # 用于显示时间序列图表的container
+                dbc.Row(id='time-series-chart', style={'width': '100%', 'marginTop': '20px'}),
+            ]),
+
+            dcc.Tab(label='Relationship', children=[
+                dbc.Row([
+                    dbc.Col(html.Div(id='reviews-rating-chart', style={'marginTop': '10px'}), width=6),
+                    dbc.Col(html.Div(id='plays-playing-chart', style={'marginTop': '10px'}), width=6),
+                ]),
+                dbc.Row([
+                    dbc.Col(dcc.Graph(id='rating-comparison-chart'), width=12),
+                ])
+            ]),
+
+            dcc.Tab(label='Feedback', children=feedback_tab_content),
+        ]),
+    ], style={'backgroundColor': 'white'}),  # 设置整个内容区域背景色为白色
+])
+
+
+# Callback to update the graph based on the uploaded file
+@app.callback(
+    [Output('data-summary-text', 'children'),
+     Output('num-games', 'children'),
+     Output('num-genres', 'children'),
+     Output('unique-developers', 'children'),
+     Output('avg-plays', 'children'),
+     Output('avg-rating', 'children'),
+     Output('num-description', 'children')],
+    
+    [Input('upload-data', 'contents'),
+     Input('upload-data', 'filename'),
+     Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date')] 
+    
+)
+
+def update_summary(content, filename, start_date, end_date):
+
+    # Initial placeholders for the statistics
+    num_games = num_genres = unique_developers = avg_plays = avg_rating = num_description = 'N/A'
+    
+    
+    if content is None:
+        return 'Upload a file to start the analysis.', num_games, num_genres, unique_developers, avg_plays, avg_rating, num_description
+
+    # Decode the uploaded file
+    content_type, content_string = content.split(',')
+    decoded = io.StringIO(base64.b64decode(content_string).decode('utf-8'))
+    df = pd.read_csv(decoded)
+    # Give a summary of the file
+    summary_text = f'The file {filename} has been uploaded.'
+
+    # Filter according to date selection
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))]
+    # Overview of data within the selected date range
+    num_games = len(filtered_df)
+    num_genres = filtered_df['genre'].nunique()
+    unique_developers = filtered_df['developer'].nunique()
+    avg_plays = round(filtered_df['plays'].mean(), 2)
+    avg_rating = round(filtered_df['rating'].mean(), 2)
+    num_description = filtered_df['description'].notna().sum()
+
+    
+    return summary_text, num_games, num_genres, unique_developers, avg_plays, avg_rating, num_description
+
+
+
+
+@app.callback(
+    Output('time-series-chart', 'children'),
+    
+    [Input('upload-data', 'contents'),
+     Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('time-series-selection', 'value'),
+     Input('genre-search-bar', 'value'),  # 接收genre的输入
+] 
+)
+
+def update_time_series_chart(contents, start_date, end_date, time_series_selection, genre):
+
+    
+    if contents is None:
+        raise PreventUpdate
+    
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+    
+    
+    
+    # Filter according to date selection
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))]
+
+    
+    # Calculate the length of the date range
+    start_year = pd.to_datetime(start_date).year
+    end_year = pd.to_datetime(end_date).year
+    
+    # Create a copy of the filtered DataFrame and add new columns
+    filtered_df = filtered_df.copy()
+
+
+    
+    resample_code = 'Y' if start_year != end_year else 'M'
+    title_suffix = 'Year' if start_year != end_year else 'Month'
+    title = lambda field: f'{field} per {title_suffix} Over Time'
+    
+
+    # 准备图表
+    fig = go.Figure()
+
+    # 根据选定的时间序列字段添加基线折线
+    if time_series_selection == 'num_games':
+        aggregated_data = filtered_df.resample(resample_code, on='date')['id'].count()
+        aggregated_data.index = aggregated_data.index.to_period(resample_code).start_time
+    
+        fig.add_trace(go.Scatter(x=aggregated_data.index, y=aggregated_data, mode='lines+markers', name='All Games'))
+        fig.update_layout(title=title('Number of Games'), xaxis_title='Date', yaxis_title='Number of Games')
+    elif time_series_selection == 'total_plays':
+        aggregated_data = filtered_df.resample(resample_code, on='date')['plays'].sum()
+        aggregated_data.index = aggregated_data.index.to_period(resample_code).start_time
+        
+        fig.add_trace(go.Scatter(x=aggregated_data.index, y=aggregated_data, mode='lines+markers', name='All Games'))
+        fig.update_layout(title=title('Total of Plays'), xaxis_title='Date', yaxis_title='Total Plays')
+    elif time_series_selection == 'avg_rating':
+        aggregated_data = filtered_df.resample(resample_code, on='date')['rating'].mean()
+        aggregated_data.index = aggregated_data.index.to_period(resample_code).start_time
+        
+        fig.add_trace(go.Scatter(x=aggregated_data.index, y=aggregated_data, mode='lines+markers', name='All Games'))
+        fig.update_layout(title=title('Average Rating'), xaxis_title='Date', yaxis_title='Rating')
+    elif time_series_selection == 'unique_genres':
+        filtered_df['genre'] = filtered_df['genre'].astype(str).str.split(', ')
+        exploded_df = filtered_df.explode('genre')
+        
+        aggregated_data = exploded_df.resample(resample_code, on='date')['genre'].nunique()
+        aggregated_data.index = aggregated_data.index.to_period(resample_code).start_time
+        
+        fig.add_trace(go.Scatter(x=aggregated_data.index, y=aggregated_data, mode='lines+markers', name='All Games'))
+        fig.update_layout(title=title('Number of Unique Genre'), xaxis_title='Date', yaxis_title='Numer of Unique Genre')
+    
+    
+    # 如果指定了genre并存在该数据，则添加相关折线
+    if genre and time_series_selection != 'unique_genres':
+        genre_df = filtered_df[filtered_df['genre'].str.contains(genre, case=False, na=False)]
+        
+        if genre_df.empty:
+            return html.Div(f'No data available for the genre "{genre}" within the selected date range.')
+        if time_series_selection == 'num_games':
+            genre_aggregated_data = genre_df.resample(resample_code, on='date')['id'].count()
+            genre_aggregated_data.index = genre_aggregated_data.index.to_period(resample_code).start_time
+        
+        elif time_series_selection == 'total_plays':
+            genre_aggregated_data = genre_df.resample(resample_code, on='date')['plays'].sum()
+            genre_aggregated_data.index = genre_aggregated_data.index.to_period(resample_code).start_time
+            
+        elif time_series_selection == 'avg_rating':
+            genre_aggregated_data = genre_df.resample(resample_code, on='date')['rating'].mean()
+            genre_aggregated_data.index = genre_aggregated_data.index.to_period(resample_code).start_time
+            
+        
+        
+        # 设置右侧纵坐标轴
+        fig.update_layout(
+            yaxis2=dict(
+                title='Genre Specific Axis',
+                overlaying='y',
+                side='right',
+                showgrid=False,
+                color='#FFA500'  # 设置轴和文字颜色为橙色
+            )
+        )
+        
+        fig.add_trace(go.Scatter(x=genre_aggregated_data.index, y=genre_aggregated_data, mode='lines+markers', name=f'Games in {genre}', line=dict(color='#FFA500'), yaxis='y2'))
+        
+        
+        # 调整图例位置，以避免遮挡
+        fig.update_layout(
+            legend=dict(
+                x=0.01,  # 图例的 x 位置
+                y=1.1,   # 图例的 y 位置
+                orientation="h"  # 水平排列图例
+            )
+        )
+
+
+    # Adjusting x-axis tick format
+    if resample_code == 'Y':
+        fig.update_xaxes(dtick="M12", tickformat="%Y")
+        fig.update_xaxes(tickfont=dict(size=8))  
+    else:
+        fig.update_xaxes(dtick="M1", tickformat="%Y-%m")
+        
+        
+    return dcc.Graph(figure=fig)
+
+
+@app.callback(
+    Output('genre-search-controls', 'style'),
+    [Input('time-series-selection', 'value')]
+)
+def toggle_genre_search_visibility(selected_chart):
+    if selected_chart == 'unique_genres':
+        return {
+            'display': 'none',
+        }
+    else:
+        return {
+            'display': 'flex',
+            'alignItems': 'Center',
+            'justifyContent': 'flex-start',
+            'flexGrow': '1', 
+            'width':'100%',
+            'height':'40px'
+        }
+
+
+
+
+
+# Callback to update the searched game data
+@app.callback(
+    [Output('modal-game-info', 'style'),  # Controls the modal's visibility
+     Output('game-info', 'children')],    # Updates the modal's content
+    [Input('search-button', 'n_clicks'),  # Search button clicks
+     Input('modal-close', 'n_clicks')],   # Close button clicks
+    [State('search-bar', 'value'),        # Text input from the user
+     State('upload-data', 'contents')]    # Contents of the uploaded file
+)
+
+def search_game(n_clicks_search, n_clicks_close, search_value, content):
+    ctx = callback_context
+
+    # Determine which button was clicked
+    if not ctx.triggered:
+        button_id = 'No buttons clicked yet'
+    else:
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # If the search button was clicked and there's valid input and file content
+    if button_id == 'search-button' and n_clicks_search and search_value and content:
+        content_type, content_string = content.split(',')
+        decoded = base64.b64decode(content_string)
+        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+        # Normalize case for a case-insensitive full match
+        search_value_lower = search_value.lower()
+        df['name_lower'] = df['name'].str.lower()
+
+        # Check for a full match rather than a partial match
+        match_df = df[df['name_lower'] == search_value_lower]
+        
+        if not match_df.empty:
+            # Assuming the first match is the desired one
+            game_info = match_df.iloc[0][['name', 'date', 'genre', 'developer', 'platform', 'rating', 'wishlists', 'description']].to_dict()
+            game_details = [
+                html.H4(game_info.get('name', 'No Name')),
+                html.P(f"Date: {game_info['date'] if pd.notna(game_info['date']) else 'No information available'}"),
+                html.P(f"Genre: {game_info['genre'] if pd.notna(game_info['genre']) else 'No information available'}"),
+                html.P(f"Developer: {game_info['developer'] if pd.notna(game_info['developer']) else 'No information available'}"),
+                html.P(f"Platform: {game_info['platform'] if pd.notna(game_info['platform']) else 'No information available'}"),
+                html.P(f"Rating: {game_info['rating'] if pd.notna(game_info['rating']) else 'No information available'}"),
+                html.P(f"Wishlists: {game_info['wishlists'] if pd.notna(game_info['wishlists']) else 'No information available'}"),
+                html.P(f"Description: {game_info['description'] if pd.notna(game_info['description']) else 'No information available'}"),
+            ]
+            return {'display': 'block'}, game_details  # Show modal with details
+        else:
+            # No exact match found
+            no_match_message = html.P("Game information not available.")
+            return {'display': 'block'}, [no_match_message]
+
+    # If the close button was clicked or there's no search action
+    if button_id == 'modal-close' or button_id == 'search-button':
+        return {'display': 'none'}, []  # Hide modal
+
+    # Default return (e.g., initial load)
+    return {'display': 'none'}, []
+
+    
+       
+    
+#新增relationship
+@app.callback(
+    Output('reviews-rating-chart', 'children'),
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_reviews_rating_chart(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+    
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+    
+    # 过滤数据集以符合选择的日期范围
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+    
+    # 生成散点图
+    fig = px.scatter(filtered_df, x='reviews', y='rating', 
+                     title='Relationship between Number of Reviews and Rating',
+                     hover_data=['name'])  # 悬停时显示游戏名称
+    
+    # 转换图表为HTML元素
+    graph_html = dcc.Graph(figure=fig)
+    
+    return graph_html
+
+
+
+
+@app.callback(
+    Output('plays-playing-chart', 'children'),
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_plays_playing_chart(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+    
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+    
+    # 过滤数据集以符合选择的日期范围
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)].copy()
+    
+    # 生成散点图
+    fig = px.scatter(filtered_df, x='plays', y='playing', 
+                     title='Relationship between Plays and Playing',
+                     hover_data=['name'])  # 悬停时显示游戏名称
+    
+    # 转换图表为HTML元素
+    graph_html = dcc.Graph(figure=fig)
+    
+    return graph_html
+
+
+@app.callback(
+    Output('rating-comparison-chart', 'figure'),
+    [Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_rating_comparison_chart(start_date, end_date, contents):
+    if contents is None:
+        raise PreventUpdate
+
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)].copy()
+
+    # Identify the developer category based on inclusion of Sony, Microsoft, or Nintendo
+    conditions = [
+        filtered_df['developer'].str.contains('Sony', case=False, na=False),
+        filtered_df['developer'].str.contains('Microsoft', case=False, na=False),
+        filtered_df['developer'].str.contains('Nintendo', case=False, na=False)
+    ]
+    choices = ['Sony', 'Microsoft', 'Nintendo']
+    filtered_df['Developer Category'] = np.select(conditions, choices, default='Others').copy()
+
+    # Plotting the box plot
+    fig = px.box(filtered_df, x='Developer Category', y='rating', title='Rating Distribution by Developer Category')
+
+    return fig
+
+
+
+@app.callback(
+    [Output('distribution-bar-chart', 'figure'),  # 图表数据
+     Output('distribution-bar-chart', 'style')],  # 控制显示样式
+    [Input('angle-selector', 'value'),
+     Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_distribution_bar_chart(angle, start_date, end_date, contents):
+    if contents is None:
+        return {}, {'display': 'none'}
+
+    # 解析上传的文件
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 过滤数据集以符合选择的日期范围
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))]
+
+    if angle == 'genre':
+        # 分类处理和柱状图制作 - Genre
+        filtered_df['genre'] = filtered_df['genre'].str.split(', ')
+        exploded_df = filtered_df.explode('genre')
+        specified_genres = ['Indie', 'Adventure', 'Simulator', 'RPG', 'Strategy', 'Shooter', 'Puzzle', 'Arcade']
+        exploded_df['genre'] = exploded_df['genre'].apply(lambda x: x if x in specified_genres else 'Others')
+        genre_counts = exploded_df['genre'].value_counts().reset_index()
+        genre_counts.columns = ['genre', 'count']
+        fig = px.bar(genre_counts, x='genre', y='count', title='Genre Distribution')
+        return fig, {'display': 'block'}
+
+    elif angle == 'platform':
+        # 分类处理和柱状图制作 - Platform
+        filtered_df['platform'] = filtered_df['platform'].str.split(', ')
+        exploded_df = filtered_df.explode('platform')
+        specified_platforms = ['Windows PC', 'Mac', 'Nintendo Switch', 'PlayStation 4', 'Linux', 'iOS', 'Xbox One', 'Android']
+        exploded_df['platform'] = exploded_df['platform'].apply(lambda x: x if x in specified_platforms else 'Others')
+        platform_counts = exploded_df['platform'].value_counts().reset_index()
+        platform_counts.columns = ['platform', 'count']
+        fig = px.bar(platform_counts, x='platform', y='count', title='Platform Distribution')
+        return fig, {'display': 'block'}
+
+    return {}, {'display': 'none'}  # 如果未选择有效的 angle，不显示图表
+
+
+
+@app.callback(
+    [Output('top-details', 'children'),
+     Output('top-details', 'style')],
+    [Input('angle-selector', 'value'),
+     Input('distribution-bar-chart', 'clickData'),
+     Input('upload-data', 'contents'),
+     Input('metric-selector', 'value')],
+    prevent_initial_call=True
+)
+def display_top_details_by_selection(angle, clickData, contents, metric):
+    ctx = dash.callback_context
+
+    if not ctx.triggered or contents is None:
+        # 如果没有触发器或者内容为空，则提示用户上传数据
+        return 'Upload data to see the top developer.'
+
+    # 判断是哪个输入触发了回调
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # 处理上传的数据
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 根据触发器和angle的值确定显示哪个开发者
+    if trigger_id == 'angle-selector' or trigger_id == 'metric-selector':
+        default_label = 'Indie' if angle == 'genre' else 'Windows PC'
+        clicked_label = default_label
+    elif clickData:
+        clicked_label = clickData['points'][0]['x']
+    else:
+        clicked_label = 'Indie'  # 或者根据context设置一个合适的默认值
+
+    required_columns = {'name', 'date', 'genre', 'developer', 'platform', 'rating', 'reviews', 'plays', 'description'}
+    if not required_columns.issubset(df.columns):
+        return [], {'display': 'none'}
+
+    if clicked_label:
+        filter_column = 'genre' if angle == 'genre' else 'platform'
+        specified = {
+            'genre': ['Indie', 'Adventure', 'Simulator', 'RPG', 'Strategy', 'Shooter', 'Puzzle', 'Arcade'],
+            'platform': ['Windows PC', 'Mac', 'Nintendo Switch', 'PlayStation 4', 'Linux', 'iOS', 'Xbox One', 'Android']
+        }
+        specified_values = specified[angle]
+
+        if clicked_label == 'Others':
+            filtered_data = df[~df[filter_column].isin(specified_values)]
+        else:
+            filtered_data = df[df[filter_column] == clicked_label]
+        
+        # 检查 filtered_data 是否为空
+        if not filtered_data.empty:
+            top_items = filtered_data.nlargest(5, metric)
+        else:
+            return [], {'display': 'none'}  # 如果过滤后没有数据，返回隐藏样式
+    else:
+        return [], {'display': 'none'}  # 如果没有 clicked_label，返回隐藏样式
+
+    children = [html.H4(f"🥳   Top 5 Games in '{clicked_label}' by {metric.capitalize()}", style={'marginTop':'10px'})]
+    for _, row in top_items.iterrows():
+        item_details = html.Div([
+            html.H5(row['name']),
+            html.P(f"Date: {row.get('date', 'Not available')}"),
+            html.P(f"Genre: {row.get('genre', 'Not available')}"),
+            html.P(f"Developer: {row.get('developer', 'Not available')}"),
+            html.P(f"Platform: {row.get('platform', 'Not available')}"),
+            html.P(f"Rating: {row.get('rating', 'Not available')}"),
+            html.P(f"Reviews: {row.get('reviews', 'Not available')}"),
+            html.P(f"Plays: {row.get('plays', 'Not available')}"),
+            html.P(f"Description: {row.get('description', 'No description available.')}")
+        ], style={'margin': '10px','marginTop': '20px', 'padding': '10px', 'border-radius': '1rem', 'backgroundColor': 'white'})
+        children.append(item_details)
+
+    return children, {'display': 'block'}
+
+
+
+
+@app.callback(
+    [Output('distribution-metrics-chart', 'figure'),
+     Output('distribution-metrics-chart', 'style')],
+    [Input('angle-selector', 'value'),
+     Input('metric-selector', 'value'),
+     Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date'),
+     Input('upload-data', 'contents')]
+)
+def update_metrics_chart(angle, metric, start_date, end_date, contents):
+    if contents is None or not metric or metric not in ['plays', 'rating', 'reviews']:
+        return {}, {'display': 'none'}  # 隐藏图表
+
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    df['date'] = pd.to_datetime(df['date'])
+    filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))]
+
+    specified_categories = {
+        'genre': ['Indie', 'Adventure', 'Simulator', 'RPG', 'Strategy', 'Shooter', 'Puzzle', 'Arcade'],
+        'platform': ['Windows PC', 'Mac', 'Nintendo Switch', 'PlayStation 4', 'Linux', 'iOS', 'Xbox One', 'Android']
+    }
+
+    filter_column = 'genre' if angle == 'genre' else 'platform'
+    specified = specified_categories[filter_column]
+
+    filtered_df[filter_column] = filtered_df[filter_column].str.split(', ')
+    exploded_df = filtered_df.explode(filter_column)
+    exploded_df[filter_column] = exploded_df[filter_column].apply(lambda x: x if x in specified else 'Others')
+
+    metric_data = exploded_df.groupby(filter_column)[metric].mean().reset_index()
+    metric_data.columns = [filter_column, f'average_{metric}']
+
+    # 计算排名并添加一个新列以指示前三名
+    metric_data['Top 3'] = metric_data[f'average_{metric}'].rank(ascending=False) <= 3
+
+    # 使用条件颜色设置突出显示前三名
+    fig = px.bar(metric_data, x=filter_column, y=f'average_{metric}', 
+                 title=f'Average {metric.capitalize()} by {angle.capitalize()}',
+                 color='Top 3',
+                 color_discrete_map={True: 'rgb(255, 215, 0)', False: 'rgb(101, 110, 242)'}  # Gold for top 3, light blue for others
+                 )
+    fig.for_each_trace(lambda t: t.update(name = 'Top 3' if t.name == 'True' else 'Others'))
+
+    return fig, {'display': 'block'}
+
+    
+    
+
+
+
+@app.callback(
+    Output('unique-developers-output', 'children'),
+    [Input('distribution-bar-chart', 'clickData'),
+     Input('angle-selector', 'value'),
+     Input('upload-data', 'contents')],
+    prevent_initial_call=True
+)
+def display_unique_developers_by_selection(clickData, angle, contents):
+    # 如果没有上传数据，则不更新
+    ctx = dash.callback_context
+
+    if not ctx.triggered or contents is None:
+        # 如果没有触发器或者内容为空，则提示用户上传数据
+        return 'Upload data to see the top developer.'
+
+    # 判断是哪个输入触发了回调
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # 处理上传的数据
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 根据触发器和angle的值确定显示哪个开发者
+    if trigger_id == 'angle-selector':
+        # 如果是 angle-selector 触发的，使用默认标签
+        default_label = 'Indie' if angle == 'genre' else 'Windows PC'
+        clicked_label = default_label
+    else:
+        # 否则，使用 clickData 中的信息
+        clicked_label = clickData['points'][0]['x'] if clickData else 'Indie'
+
+    # 过滤得到相应的数据
+    df_filtered = filter_data(df, clicked_label, angle)
+
+    # 计算唯一开发者的数量
+    unique_developers = df_filtered['developer'].nunique()
+
+    # 构建输出显示的内容
+    return html.Div([
+        html.H3(f"💻   Number of Developers under '{clicked_label}':", style={'fontSize': '16px', 'fontWeight': 'bold', 'color':'white'}),
+        html.P(f"{unique_developers}", style={'fontSize': '24px', 'marginTop': '10px', 'fontWeight': 'bold', 'color':'white'})
+    ])
+
+def filter_data(df, label, filter_column):
+    # 根据给定的列和标签筛选数据，处理 'Others' 选项
+    specified = {
+        'genre': ['Indie', 'Adventure', 'Simulator', 'RPG', 'Strategy', 'Shooter', 'Puzzle', 'Arcade'],
+        'platform': ['Windows PC', 'Mac', 'Nintendo Switch', 'PlayStation 4', 'Linux', 'iOS', 'Xbox One', 'Android']
+    }
+    if label == 'Others':
+        df_filtered = df[~df[filter_column].str.contains('|'.join(specified[filter_column]), na=False)]
+    else:
+        df_filtered = df[df[filter_column].str.contains(label, na=False)]
+    
+    return df_filtered
+
+
+@app.callback(
+    Output('top-developer-output', 'children'),
+    [Input('distribution-bar-chart', 'clickData'),
+     Input('angle-selector', 'value'),
+     Input('upload-data', 'contents')],
+    prevent_initial_call=True
+)
+def display_top_developer_by_selection(clickData, angle, contents):
+    ctx = dash.callback_context
+
+    if not ctx.triggered or contents is None:
+        # 如果没有触发器或者内容为空，则提示用户上传数据
+        return 'Upload data to see the top developer.'
+
+    # 判断是哪个输入触发了回调
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # 处理上传的数据
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 根据触发器和angle的值确定显示哪个开发者
+    if trigger_id == 'angle-selector':
+        # 如果是 angle-selector 触发的，使用默认标签
+        default_label = 'Indie' if angle == 'genre' else 'Windows PC'
+        clicked_label = default_label
+    else:
+        # 否则，使用 clickData 中的信息
+        clicked_label = clickData['points'][0]['x'] if clickData else 'Indie'
+
+    # 根据 angle 设置默认点击标签
+    specified_categories = {
+        'genre': ['Indie', 'Adventure', 'Simulator', 'RPG', 'Strategy', 'Shooter', 'Puzzle', 'Arcade'],
+        'platform': ['Windows PC', 'Mac', 'Nintendo Switch', 'PlayStation 4', 'Linux', 'iOS', 'Xbox One', 'Android']
+    }
+    filter_column = 'genre' if angle == 'genre' else 'platform'
+    specified = specified_categories[filter_column]
+
+    if clicked_label == 'Others':
+        df_filtered = df[~df[filter_column].str.contains('|'.join(specified), na=False)]
+    else:
+        df_filtered = df[df[filter_column].str.contains(clicked_label, na=False)]
+
+    developer_counts = df_filtered['developer'].value_counts().reset_index()
+    developer_counts.columns = ['developer', 'count']
+
+    if not developer_counts.empty:
+        top_developer = developer_counts.iloc[0]['developer']
+        top_developer_games_count = developer_counts.iloc[0]['count']
+        return html.Div([
+            html.H4(f"🏆     Top Developers under '{clicked_label}' {angle}", style={'fontSize': '16px', 'fontWeight': 'bold'}),
+            html.P(f"{top_developer} ({top_developer_games_count} games)", style={'fontSize': '20px', 'marginTop': '10px', 'fontWeight': 'bold'})
+        ])
+    else:
+        return f"No games found in the '{clicked_label}' {angle}."
+
+
+
+
+
+
+    
+# 确保你的布局中有以下元素：
+# dcc.Graph(id='distribution-bar-chart'),
+# html.Div(id='top-developer-metric-output'),
+# dcc.Dropdown(id='angle-selector'),
+# dcc.Dropdown(id='metric-selector'),
+
+@app.callback(
+    Output('top-developer-metric-output', 'children'),
+    [Input('distribution-bar-chart', 'clickData'),
+     Input('angle-selector', 'value'),
+     Input('metric-selector', 'value'),
+     Input('upload-data', 'contents')],
+    prevent_initial_call=True
+)
+def display_top_developers_metric(clickData, angle, metric, contents):
+    ctx = dash.callback_context
+
+    if not ctx.triggered or contents is None:
+        # 如果没有触发器或者内容为空，则提示用户上传数据
+        return 'Upload data to see the top developer.'
+
+    # 判断是哪个输入触发了回调
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    # 处理上传的数据
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+
+    # 根据触发器和angle的值确定显示哪个开发者
+    if trigger_id == 'angle-selector' or trigger_id == 'metric-selector':
+        default_label = 'Indie' if angle == 'genre' else 'Windows PC'
+        clicked_label = default_label
+    elif clickData:
+        clicked_label = clickData['points'][0]['x']
+    else:
+        clicked_label = 'Indie'  # 或者根据context设置一个合适的默认值
+
+    # 根据选择的角度设置默认标签
+    specified_categories = {
+        'genre': ['Indie', 'Adventure', 'Simulator', 'RPG', 'Strategy', 'Shooter', 'Puzzle', 'Arcade'],
+        'platform': ['Windows PC', 'Mac', 'Nintendo Switch', 'PlayStation 4', 'Linux', 'iOS', 'Xbox One', 'Android']
+    }
+
+    # 根据角度选择器的值筛选数据
+    filter_column = 'genre' if angle == 'genre' else 'platform'
+    specified = specified_categories[filter_column]
+
+    if clicked_label == 'Others':
+        df_filtered = df[~df[filter_column].str.contains('|'.join(specified), na=False)]
+    else:
+        df_filtered = df[df[filter_column].str.contains(clicked_label, na=False)]
+
+    # 计算每个开发者的平均metric值
+    if metric in ['plays', 'rating', 'reviews']:
+        developer_metric_avg = df_filtered.groupby('developer')[metric].mean().reset_index()
+        developer_metric_avg.columns = ['developer', f'average_{metric}']
+        developer_metric_avg.sort_values(by=f'average_{metric}', ascending=False, inplace=True)
+
+
+        # 创建滚动容器并添加每个开发者的详细信息
+        children = html.Div(
+            [
+                html.Div(
+                    [
+                        html.H4(
+                            f"🎉   Top Developers in '{clicked_label}' by Average {metric.capitalize()}:",
+                            style={
+                                'fontSize': '16px',  # Larger font size for heading
+                                'fontWeight': 'bold',
+                                'color': '#5e72e4',  # Matching the primary color theme
+                                'marginTop':'15px',
+                                'marginBottom': '15px',  # Spacing between the header and list
+                                'padding': '10px',  # Padding around the text for better spacing
+                                'backgroundColor': '#f8f9fa',  # Light background for the header
+                                'borderRadius': '5px',  # Rounded corners for the header
+                                'boxShadow': '0 2px 4px rgba(0, 0, 0, 0.1)'  # Subtle shadow for depth
+                            }
+                        ),
+                        html.Ul(
+                            [
+                                html.Li(
+                                    f"{row['developer']}: {row[f'average_{metric}']:.2f}", 
+                                    style={
+                                        'fontSize': '16px',  # Uniform font size for list items
+                                        'color': '#343a40',  # Darker text for readability
+                                        'padding': '5px',  # Padding for list items
+                                        'borderBottom': '1px solid #e9ecef',  # Divider between items
+                                        'last-child': {'border': 'none'}  # Remove border for the last item
+                                    }
+                                ) for _, row in developer_metric_avg.head(5).iterrows()
+                            ],
+                            style={
+                                'listStyleType': 'none',  # Remove bullets from the list
+                                'margin': '0',  # Remove default margin
+                                'maxHeight': '250px',  # Limit the height of the list
+                                'overflowY': 'auto',  # Allow scrolling within the list
+                                'backgroundColor': '#ffffff',  # White background for the list
+                                'borderRadius': '5px',  # Rounded corners for the list
+                                'boxShadow': '0 2px 4px rgba(0, 0, 0, 0.1)',  # Subtle shadow for depth
+                            }
+                        )
+                    ],
+                    style={
+                        'padding': '10px',  # Padding around the entire component
+                        'backgroundColor': 'rgba(94, 114, 228, 0.5)',  # Semi-transparent primary color background
+                        'borderRadius': '5px',  # Rounded corners for the outer div
+                        'boxShadow': '0 4px 8px rgba(0, 0, 0, 0.2)',  # Shadow for the outer div
+                        'height': '303px', 
+                        "justify-content": "center", "align-items": "center"
+                    }
+                )
+
+            ],
+            style={'display': 'block'}
+        )
+    else:
+        children = f"No valid metric selected."
+
+    return children
+
+
+
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+from dash import Dash, html, dcc, Input, Output, callback  # 根据您的Dash版本，导入方式可能略有不同
+
+# 假设以下是您Dash应用的一部分
+
+
+
+
+
+
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
