@@ -521,6 +521,9 @@ def update_summary(content, filename, start_date, end_date):
 ] 
 )
 
+
+
+# ----------以下为更新的function---------------------------
 def update_time_series_chart(contents, start_date, end_date, time_series_selection, genre):
 
     
@@ -586,12 +589,22 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
         fig.update_layout(title=title('Number of Unique Genre'), xaxis_title='Date', yaxis_title='Numer of Unique Genre')
     
     
+    # Adjusting x-axis tick format
+    if resample_code == 'Y':
+        fig.update_xaxes(dtick="M12", tickformat="%Y")
+        fig.update_xaxes(tickfont=dict(size=8))  
+    else:
+        fig.update_xaxes(dtick="M1", tickformat="%Y-%m")
+        fig.update_xaxes(tickfont=dict(size=8)) 
+    
+    
+    
     # 如果指定了genre并存在该数据，则添加相关折线
     if genre and time_series_selection != 'unique_genres':
         genre_df = filtered_df[filtered_df['genre'].str.contains(genre, case=False, na=False)]
         
         if genre_df.empty:
-            return html.Div(f'No data available for the genre "{genre}" within the selected date range.')
+            return html.Div(f'No data available for the genre "{genre}" within the selected date range.'), dcc.Graph(figure=fig)
         if time_series_selection == 'num_games':
             genre_aggregated_data = genre_df.resample(resample_code, on='date')['id'].count()
             genre_aggregated_data.index = genre_aggregated_data.index.to_period(resample_code).start_time
@@ -607,17 +620,22 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
         
         
         # 设置右侧纵坐标轴
-        fig.update_layout(
-            yaxis2=dict(
-                title='Genre Specific Axis',
-                overlaying='y',
-                side='right',
-                showgrid=False,
-                color='#FFA500'  # 设置轴和文字颜色为橙色
+        if time_series_selection != 'avg_rating':
+            fig.update_layout(
+                yaxis2=dict(
+                    title='Genre Specific Axis',
+                    overlaying='y',
+                    side='right',
+                    showgrid=False,
+                    color='#FFA500'  # 设置轴和文字颜色为橙色
+                )
             )
-        )
         
-        fig.add_trace(go.Scatter(x=genre_aggregated_data.index, y=genre_aggregated_data, mode='lines+markers', name=f'Games in {genre}', line=dict(color='#FFA500'), yaxis='y2'))
+            fig.add_trace(go.Scatter(x=genre_aggregated_data.index, y=genre_aggregated_data, mode='lines+markers', name=f'Games in {genre}', line=dict(color='#FFA500'), yaxis='y2'))
+        
+        else:
+        
+            fig.add_trace(go.Scatter(x=genre_aggregated_data.index, y=genre_aggregated_data, mode='lines+markers', name=f'Games in {genre}', line=dict(color='#FFA500')))
         
         
         # 调整图例位置，以避免遮挡
@@ -629,16 +647,11 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
             )
         )
 
-
-    # Adjusting x-axis tick format
-    if resample_code == 'Y':
-        fig.update_xaxes(dtick="M12", tickformat="%Y")
-        fig.update_xaxes(tickfont=dict(size=8))  
-    else:
-        fig.update_xaxes(dtick="M1", tickformat="%Y-%m")
-        
         
     return dcc.Graph(figure=fig)
+
+# ----------------------------------------
+
 
 
 @app.callback(
