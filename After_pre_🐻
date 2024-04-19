@@ -178,7 +178,7 @@ filter_bar = html.Div([
 
 
 genre_checklist = html.Div([
-    dbc.Label("Select Genres:"),
+    dbc.Label("Select Genres: (After selecting, result show below ⬇️)"),
     dcc.Checklist(
         id='genre-checklist',
         options=[],  # Initially empty
@@ -761,8 +761,8 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
 
             # Creating the table with Plotly
             fig = go.Figure(data=[go.Table(
-                header=dict(values=['Genre', 'Game Count Rank', 'Total Plays Rank', 'Average Rating Rank']),
-                cells=dict(values=[summary_df['genre'], summary_df['Game Count Rank'], summary_df['Total Plays Rank'], summary_df['Average Rating Rank']],
+                header=dict(values=['Genre', 'Average Rating Rank', 'Game Count Rank', 'Total Plays Rank']),
+                cells=dict(values=[summary_df['genre'], summary_df['Average Rating Rank'], summary_df['Game Count Rank'], summary_df['Total Plays Rank']],
                            fill_color=[summary_df['Selected'], 'white', 'white', 'white'])
             )])
             fig.update_layout(title_text=f"Rank of Genres for the Year {year} (Number of Total Unique Genres: {unique_genres})")
