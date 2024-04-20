@@ -356,58 +356,8 @@ app.layout = dbc.Container(children=[
     ]
 ),
 
-        # Search bar
-        html.Div(
-            style={'display': 'flex', 'justifyContent': 'flex-start', 'marginRight': '10px', 'marginTop': '20px', 'flexGrow': '1'},
-            children=[
-                dbc.Input(id='search-bar', type='text', placeholder='Search for a game...', className='me-1', style={'width': '1250px', 'height': '50px'}),
-                html.Div(  # 内部容器，用于更灵活地控制搜索按钮的位置
-                    style={'marginLeft': '20px', 'alignSelf': 'flex-start'},  # 控制内部按钮的左边距和垂直对齐
-                    children=[
-                        dbc.Button('Search', id='search-button', n_clicks=0, color="primary", className='me-2 shadow-sm', style={'fontWeight': 'bold', 'marginTop': '3px'}),
-                    ])]
-        ),
     ], style={'backgroundColor': '#5e72e4', 'padding': '20px'}),
 
-    # Custom modal (hidden by default)
-    html.Div(
-        id='modal-game-info',
-        style={'display': 'none'},  # 控制显示隐藏
-        children=[
-            # Modal content container
-            html.Div(
-                style={
-                    'backgroundColor': 'white',
-                    'padding': '20px',
-                    'borderRadius': '10px',
-                    'position': 'fixed',
-                    'top': '50%', 'left': '50%',
-                    'transform': 'translate(-50%, -50%)',
-                    'zIndex': '1040',  # 确保modal内容在遮罩之上
-                    'width': '80%',  # 设置弹窗宽度
-                    'maxWidth': '600px'  # 设置弹窗的最大宽度
-                },
-                children=[
-                    html.H4("Game Details", id='modal-title'),
-                    html.Div(id='game-info'),
-                    dbc.Button('Close', id='modal-close', n_clicks=0, color="secondary"),
-                ]
-            ),
-            # Overlay to capture clicks outside the modal, ensuring it covers the entire viewport
-            html.Div(
-                style={
-                    'position': 'fixed',
-                    'top': 0, 'left': 0,
-                    'height': '100vh', 'width': '100vw',
-                    'backgroundColor': 'rgba(0,0,0,0.5)',
-                    'zIndex': '1030'  # 确保遮罩在内容之下，但高于其他所有内容
-                }
-            )
-        ]
-    ),
-
-    # Store component for state management
-    dcc.Store(id='store-searched-game', storage_type='session'),
     
     
     #------------------------------------------------------------------------------------------------
@@ -477,9 +427,47 @@ app.layout = dbc.Container(children=[
             ]),
 
             dcc.Tab(label='Feedback', children=feedback_tab_content),
+
+            dcc.Tab(label='Recommendation', children=[
+                # Search bar
+                html.Div(
+                    style={'display': 'flex', 'justifyContent': 'flex-start', 'marginRight': '10px', 'marginTop': '20px', 'flexGrow': '1'},
+                    children=[
+                        dbc.Input(id='search-bar', type='text', placeholder='Search for a game...', className='me-1', style={'width': '1250px', 'height': '50px'}),
+                        html.Div(  # 内部容器，用于更灵活地控制搜索按钮的位置
+                            style={'marginLeft': '20px', 'alignSelf': 'flex-start'},  # 控制内部按钮的左边距和垂直对齐
+                            children=[
+                                dbc.Button('Search', id='search-button', n_clicks=0, color="primary", className='me-2 shadow-sm', style={'fontWeight': 'bold', 'marginTop': '3px'}),
+                            ])]
+                ),
+                html.Div(id='game-details-output', style={'marginTop': '20px'})
+            ]),
         ]),
     ], style={'backgroundColor': 'white'}),  # 设置整个内容区域背景色为白色
 ])
+
+@app.callback(
+    Output('date-picker-range', 'start_date'),
+    [Input('upload-data', 'contents')]
+)
+def update_date_range(contents):
+    if contents is None:
+        # Return the default start date if no file is uploaded
+        return '1900-01-01'
+    
+    # Decode the uploaded file content
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+    
+    # Convert 'date' column to datetime
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    
+    # Get the minimum date from the 'date' column
+    min_date = df['date'].min()
+    
+    # Check if min_date is NaT (not a time), then return default, otherwise return min_date
+    return min_date if pd.notna(min_date) else '1900-01-01'
 
 
 # Callback to update the graph based on the uploaded file
@@ -517,6 +505,7 @@ def update_summary(content, filename, start_date, end_date):
 
     # Filter according to date selection
     df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    start_date = df['date'].min()
     filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))]
     # Overview of data within the selected date range
     num_games = len(filtered_df)
@@ -643,20 +632,13 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
                 xaxis_title='Date',
                 yaxis_title=time_series_selection.replace('_', ' ').title()
             )
-            
-            
 
             # Adjusting x-axis tick format
             tickformat = "%Y" if resample_code == 'Y' else "%Y-%m"
             fig.update_xaxes(dtick="M12" if resample_code == 'Y' else "M1", tickformat=tickformat)
             fig.update_xaxes(tickfont=dict(size=8))
-
             
-            graphs.append(dcc.Graph(figure=fig))
-            
-            
-    
-    
+            graphs.append(dcc.Graph(figure=fig))    
 
         if genres:
             
@@ -688,20 +670,12 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
                 # Adjusting x-axis tick format
                 tickformat = "%Y" if resample_code == 'Y' else "%Y-%m"
                 fig2.update_xaxes(dtick="M12" if resample_code == 'Y' else "M1", tickformat=tickformat)
-                fig2.update_xaxes(tickfont=dict(size=8))
-                
-                
+                fig2.update_xaxes(tickfont=dict(size=8))                
                 
                 graphs.append(dcc.Graph(figure=fig2))
 
         #return graphs 
             pass
-                        
-                        
-                        
-                        
-
-
 
 
                          
@@ -786,15 +760,15 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
 
 # Callback to update the searched game data
 @app.callback(
-    [Output('modal-game-info', 'style'),  # Controls the modal's visibility
-     Output('game-info', 'children')],    # Updates the modal's content
-    [Input('search-button', 'n_clicks'),  # Search button clicks
-     Input('modal-close', 'n_clicks')],   # Close button clicks
-    [State('search-bar', 'value'),        # Text input from the user
-     State('upload-data', 'contents')]    # Contents of the uploaded file
+    Output('game-details-output', 'children'),
+    [Input('search-button', 'n_clicks'),
+     Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date')],
+    [State('search-bar', 'value'),
+     State('upload-data', 'contents')]
 )
 
-def search_game(n_clicks_search, n_clicks_close, search_value, content):
+def search_game(n_clicks_search, start_date, end_date, search_value, content):
     ctx = callback_context
 
     # Determine which button was clicked
@@ -802,12 +776,13 @@ def search_game(n_clicks_search, n_clicks_close, search_value, content):
         button_id = 'No buttons clicked yet'
     else:
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
+    
     # If the search button was clicked and there's valid input and file content
     if button_id == 'search-button' and n_clicks_search and search_value and content:
         content_type, content_string = content.split(',')
         decoded = base64.b64decode(content_string)
         df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+        df['date'] = pd.to_datetime(df['date'])
 
         # Normalize case for a case-insensitive full match
         search_value_lower = search_value.lower()
@@ -815,13 +790,15 @@ def search_game(n_clicks_search, n_clicks_close, search_value, content):
 
         # Check for a full match rather than a partial match
         match_df = df[df['name_lower'] == search_value_lower]
+            
         
         if not match_df.empty:
             # Assuming the first match is the desired one
             game_info = match_df.iloc[0][['name', 'date', 'genre', 'developer', 'platform', 'rating', 'wishlists', 'description']].to_dict()
+            #return [html.P(f"{game_info['name']} found")]
             game_details = [
                 html.H4(game_info.get('name', 'No Name')),
-                html.P(f"Date: {game_info['date'] if pd.notna(game_info['date']) else 'No information available'}"),
+                html.P(f"Date: {game_info['date'].strftime('%Y-%m-%d') if pd.notna(game_info['date']) else 'No information available'}"),
                 html.P(f"Genre: {game_info['genre'] if pd.notna(game_info['genre']) else 'No information available'}"),
                 html.P(f"Developer: {game_info['developer'] if pd.notna(game_info['developer']) else 'No information available'}"),
                 html.P(f"Platform: {game_info['platform'] if pd.notna(game_info['platform']) else 'No information available'}"),
@@ -829,18 +806,51 @@ def search_game(n_clicks_search, n_clicks_close, search_value, content):
                 html.P(f"Wishlists: {game_info['wishlists'] if pd.notna(game_info['wishlists']) else 'No information available'}"),
                 html.P(f"Description: {game_info['description'] if pd.notna(game_info['description']) else 'No information available'}"),
             ]
-            return {'display': 'block'}, game_details  # Show modal with details
+
+            # Exclude the searched game itself from similar game search
+            curr_game = game_info['name']
+            
+            # Filter for games of the same genre within the selected date range
+            no_genre = pd.isna(game_info['genre'])
+            no_date = pd.isna(game_info['date'])
+
+            if no_genre and no_date:
+                return game_details + [html.P("Not enough information to find similar games.")]
+            elif no_genre:
+                date_filter = (df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))
+                relevant_games_df = df[date_filter & (df['name'] != curr_game)]
+            elif no_date:
+                genre_filter = df['genre'].str.contains(game_info['genre'], case=False, na=False)
+                relevant_games_df = df[genre_filter & (df['name'] != curr_game)]
+            else:  
+                genre_filter = df['genre'].str.contains(game_info['genre'], case=False, na=False)
+                date_filter = (df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))
+                relevant_games_df = df[genre_filter & date_filter & (df['name'] != curr_game)]
+
+            game_count = relevant_games_df.shape[0]
+            if game_count == 0:
+                return game_details + [html.P("There aren't any similar games.")]
+            else:
+                top_games_df = relevant_games_df.sort_values(by='rating', ascending=False).head(min(5, game_count))
+                header_text = f"Top {min(game_count, 5)} games in the same genre and time frame:"
+                top_games_details = [html.H5(header_text)]
+                top_games_details.extend([html.P(f"{game['name']} - Rating: {game['rating']}") for _, game in top_games_df.iterrows()])
+                return game_details + top_games_details
+            
         else:
             # No exact match found
-            no_match_message = html.P("Game information not available.")
-            return {'display': 'block'}, [no_match_message]
-
-    # If the close button was clicked or there's no search action
-    if button_id == 'modal-close' or button_id == 'search-button':
-        return {'display': 'none'}, []  # Hide modal
-
-    # Default return (e.g., initial load)
-    return {'display': 'none'}, []
+            # Filter for games starting with the search value
+            match_df = df[df['name_lower'].str.startswith(search_value_lower)]
+            if match_df.shape[0] > 0:
+                # Limit to the first 10 games and create a list with each game on a new line
+                games_list = match_df['name'].head(10).tolist()
+                suggestions = [html.P(f"Are you looking for one of these games?")] + \
+                              [html.Div(game) for game in games_list]
+                return suggestions
+            else:
+                no_match_message = html.P("Game information not available.")
+                return [no_match_message]
+    return []
 
     
        
