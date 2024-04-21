@@ -605,17 +605,6 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
         title_suffix = 'Year' if start_year != end_year else 'Month'
         title = lambda field: f'{field} per {title_suffix} Over Time (All Games)'
         title2 = lambda field: f'{field} per {title_suffix} Over Time (Specific Genres)'
-
-        # Determine overall time range for x-axis synchronization
-        #overall_start = filtered_df['date'].min()
-        #overall_end = filtered_df['date'].max()
-
-        # Adjust the padding amount as needed, for example 5% of your date range
-        #date_range_span = overall_end - overall_start
-        #padding = date_range_span * 0.05  # Adjust the 0.05 to increase or decrease padding
-
-        #padded_start = overall_start - padding
-        #padded_end = overall_end + padding
         
         
 
@@ -659,8 +648,6 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
                         fig2.add_trace(go.Scatter(x=genre_specific_data.index, y=genre_specific_data, mode='lines+markers', name=f'Games in {genre}'))
                         data_available = True  # 至少有一个genre有数据
 
-                    #else:
-                        #graphs.append(html.Div(f'No data available for the genre "{genre}" within the selected date range.'))
                         
             if not fig2.data:
                 graphs.append(html.Div("No sufficient data available for any selected genres."))
@@ -702,6 +689,8 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
         unique_genres = df['genre'].nunique()
 
         # Group by genre and calculate metrics
+        df['genre'] = df['genre'].fillna('Unknown')  # Replace NaN with a placeholder if appropriate
+
         games_count = df['genre'].value_counts().reset_index(name='Game Count')
         total_plays = df.groupby('genre')['plays'].sum().reset_index(name='Total Plays')
         average_rating = df.groupby('genre')['rating'].mean().reset_index(name='Average Rating')
@@ -715,6 +704,8 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
         summary_df.fillna({'Game Count': 0, 'Total Plays': 0, 'Average Rating': 'No Rating'}, inplace=True)
 
         # Calculate rankings with handling of missing values
+        summary_df = summary_df[summary_df['genre'] != 'Unknown']
+
         summary_df['Game Count Rank'] = summary_df['Game Count'].rank(method='min', ascending=False)
         summary_df['Total Plays Rank'] = summary_df['Total Plays'].rank(method='min', ascending=False)
         summary_df['Average Rating Rank'] = summary_df['Average Rating'].replace('No Rating', np.nan).rank(method='min', ascending=True)
