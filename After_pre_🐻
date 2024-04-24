@@ -505,7 +505,6 @@ def update_summary(content, filename, start_date, end_date):
 
     # Filter according to date selection
     df['date'] = pd.to_datetime(df['date'], errors='coerce')
-    start_date = df['date'].min()
     filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))]
     # Overview of data within the selected date range
     num_games = len(filtered_df)
@@ -801,32 +800,49 @@ def search_game(n_clicks_search, start_date, end_date, search_value, content):
             # Exclude the searched game itself from similar game search
             curr_game = game_info['name']
             
-            # Filter for games of the same genre within the selected date range
+            # Filter for games with genre and rating
             no_genre = pd.isna(game_info['genre'])
-            no_date = pd.isna(game_info['date'])
+            no_rating = pd.isna(game_info['rating'])
 
-            if no_genre and no_date:
+            if no_genre:
                 return game_details + [html.P("Not enough information to find similar games.")]
-            elif no_genre:
-                date_filter = (df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))
-                relevant_games_df = df[date_filter & (df['name'] != curr_game)]
-            elif no_date:
-                genre_filter = df['genre'].str.contains(game_info['genre'], case=False, na=False)
-                relevant_games_df = df[genre_filter & (df['name'] != curr_game)]
-            else:  
-                genre_filter = df['genre'].str.contains(game_info['genre'], case=False, na=False)
-                date_filter = (df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))
-                relevant_games_df = df[genre_filter & date_filter & (df['name'] != curr_game)]
+            
+            genre_filter = df['genre'].str.contains(game_info['genre'], case=False, na=False)
+            date_filter = (df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))
+            relevant_games_df = df[genre_filter & date_filter & (df['name'] != curr_game)]
 
             game_count = relevant_games_df.shape[0]
             if game_count == 0:
-                return game_details + [html.P("There aren't any similar games.")]
+                top_games_details = [html.P("There are no similar games within the selected time frame.")]
+                return game_details + top_games_details
             else:
                 top_games_df = relevant_games_df.sort_values(by='rating', ascending=False).head(min(5, game_count))
                 header_text = f"Top {min(game_count, 5)} games in the same genre and time frame:"
                 top_games_details = [html.H5(header_text)]
-                top_games_details.extend([html.P(f"{game['name']} - Rating: {game['rating']}") for _, game in top_games_df.iterrows()])
+                top_games_details.extend([
+                html.P([
+                    game['name'],
+                    html.Br(),  # This inserts an actual HTML line break element
+                    f"Rating: {game['rating']}"]) for _, game in top_games_df.iterrows()
+                ])
+                
+            if no_rating:
                 return game_details + top_games_details
+            else:
+                # The date and rating of the specific game
+                game_rating = game_info['rating']
+                game_date = pd.to_datetime(game_info['date'])
+                # Take away games with no ratings
+                rating_rank_df = relevant_games_df.dropna(subset=['rating'])
+                rating_rank_df = pd.concat([rating_rank_df, match_df], ignore_index=True)          
+                # Calculate ranks and percentile ranks
+                rating_rank_df['rating_rank'] = rating_rank_df['rating'].rank(method='max')  # Use 'max' to handle ties
+                rating_rank_df['percentile_rank'] = rating_rank_df['rating_rank'] / len(rating_rank_df) * 100
+                # Find the percentile rank for the specific game
+                game_percentile = rating_rank_df[rating_rank_df['rating'] == game_rating]['percentile_rank'].max()
+                percentile_message = [html.P(f"The rating of {game_info['name']} exceeds {game_percentile:.2f} percent of games for similar games within the selected time frame.")]
+                return game_details + top_games_details + percentile_message
+            
             
         else:
             # No exact match found
