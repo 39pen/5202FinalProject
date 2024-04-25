@@ -885,9 +885,9 @@ def update_reviews_rating_chart(start_date, end_date, contents):
     # 生成散点图
     fig = px.scatter(filtered_df, x='reviews', y='rating', 
                      title='Relationship between Number of Reviews and Rating',
-                     hover_data=['name'])  # 悬停时显示游戏名称
+                     hover_data=['name'])  
     
-    # 转换图表为HTML元素
+   
     graph_html = dcc.Graph(figure=fig)
     
     return graph_html
@@ -917,12 +917,12 @@ def update_plays_playing_chart(start_date, end_date, contents):
     # 生成散点图
     fig = px.scatter(filtered_df, x='plays', y='playing', 
                      title='Relationship between Plays and Playing',
-                     hover_data=['name'])  # 悬停时显示游戏名称
+                     hover_data=['name'])  
     
-    # 转换图表为HTML元素
     graph_html = dcc.Graph(figure=fig)
     
     return graph_html
+
 
 
 @app.callback(
@@ -957,10 +957,10 @@ def update_rating_comparison_chart(start_date, end_date, contents):
     return fig
 
 
-
+#callback to update the 'feedback' tab
 @app.callback(
-    [Output('distribution-bar-chart', 'figure'),  # 图表数据
-     Output('distribution-bar-chart', 'style')],  # 控制显示样式
+    [Output('distribution-bar-chart', 'figure'),  
+     Output('distribution-bar-chart', 'style')],  
     [Input('angle-selector', 'value'),
      Input('date-picker-range', 'start_date'),
      Input('date-picker-range', 'end_date'),
@@ -1118,6 +1118,9 @@ def update_metrics_chart(angle, metric, start_date, end_date, contents):
     metric_data = exploded_df.groupby(filter_column)[metric].mean().reset_index()
     metric_data.columns = [filter_column, f'average_{metric}']
 
+    # 对数据进行排序，以便图表按照平均值从高到低显示
+    metric_data.sort_values(f'average_{metric}', ascending=False, inplace=True)
+
     # 计算排名并添加一个新列以指示前三名
     metric_data['Top 3'] = metric_data[f'average_{metric}'].rank(ascending=False) <= 3
 
@@ -1256,13 +1259,6 @@ def display_top_developer_by_selection(clickData, angle, contents):
 
 
 
-    
-# 确保你的布局中有以下元素：
-# dcc.Graph(id='distribution-bar-chart'),
-# html.Div(id='top-developer-metric-output'),
-# dcc.Dropdown(id='angle-selector'),
-# dcc.Dropdown(id='metric-selector'),
-
 @app.callback(
     Output('top-developer-metric-output', 'children'),
     [Input('distribution-bar-chart', 'clickData'),
@@ -1384,12 +1380,7 @@ def display_top_developers_metric(clickData, angle, metric, contents):
 import numpy as np
 import pandas as pd
 import plotly.express as px
-from dash import Dash, html, dcc, Input, Output, callback  # 根据您的Dash版本，导入方式可能略有不同
-
-# 假设以下是您Dash应用的一部分
-
-
-
+from dash import Dash, html, dcc, Input, Output, callback 
 
 
 
