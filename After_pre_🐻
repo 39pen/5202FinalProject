@@ -10,9 +10,6 @@ import tabulate
 import plotly.express as px
 import plotly.graph_objs as go
 
-
-
-#新增：cluster analysis所需要的安装包
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
@@ -23,6 +20,11 @@ from dash import dash_table
 from dash.dash_table.Format import Format 
 import plotly.graph_objs as go
 from dash import no_update
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+from dash import Dash, html, dcc, Input, Output, callback 
 
 card_content_a = [
     dbc.CardHeader(
@@ -116,7 +118,6 @@ card_content_f = [
 ]
 
 # Define the cards of Feedback 
-# Define the card style with rounded corners and shadows
 card_style_a = {
     'backgroundColor': 'rgba(94, 114, 228, 0.75)',  # Semi-transparent blue background
     'boxShadow': '0 4px 8px rgba(0, 0, 0, 0.15)',  # Subtle shadow
@@ -188,23 +189,17 @@ genre_checklist = html.Div([
 ], className="mb-3")  # You can adjust className for styling as per your needs
 
 
-enter_year = html.Div(
-            [
-                html.P("Enter Year:"),
-                dcc.Input(
-                    id='year-input',
-                    type='number',
-                    value=2000,
-                    min=1900,
-                    max=datetime.now().year,
-                    step=1
-                )
-            ],
-            id='input-container',
-            style={'display': 'None'},  # Initially invisible 
-    className="mb-4")  # Add a bottom margin
-
-#---------------------------------------------------------------------------------------------------------
+enter_year = html.Div([
+    dbc.Label("Enter Year:"),
+    dcc.Input(
+        id='year-input',
+        type='number',
+        value=2000,
+        min=1900,
+        max=datetime.now().year,
+        step=1
+    )
+], id='input-container', style={'display': 'None'}, className="mb-3")  # Add a bottom margin
 
 
 
@@ -304,6 +299,20 @@ feedback_tab_content = [
     ], className='g-0 mx-0')  # Use 'g-0' to remove gutters completely, 'mx-0' to remove horizontal margins
 ]
 
+search_tab_content = [
+    # Search bar
+    html.Div(
+        style={'display': 'flex', 'justifyContent': 'flex-start', 'marginRight': '10px', 'marginTop': '20px', 'flexGrow': '1'},
+        children=[
+            dbc.Input(id='search-bar', type='text', placeholder='Search for a game...', className='me-1', style={'width': '1250px', 'height': '50px'}),
+            html.Div(  # 内部容器，用于更灵活地控制搜索按钮的位置
+                style={'marginLeft': '20px', 'alignSelf': 'flex-start'},  # 控制内部按钮的左边距和垂直对齐
+                children=[
+                    dbc.Button('Search', id='search-button', n_clicks=0, color="primary", className='me-2 shadow-sm', style={'fontWeight': 'bold', 'marginTop': '3px'}),
+                ])]
+    ),
+    html.Div(id='game-details-output', style={'marginTop': '20px'})
+]
 
 
 
@@ -400,10 +409,7 @@ app.layout = dbc.Container(children=[
 
                 # 新增：filter bar
                 filter_bar,
-                
-                #-----------------------------------------------------------------------------------------
                 genre_checklist,
-                
                 enter_year,
 
                 #-----------------------------------------------------------------------------------------
@@ -428,20 +434,7 @@ app.layout = dbc.Container(children=[
 
             dcc.Tab(label='Feedback', children=feedback_tab_content),
 
-            dcc.Tab(label='Recommendation', children=[
-                # Search bar
-                html.Div(
-                    style={'display': 'flex', 'justifyContent': 'flex-start', 'marginRight': '10px', 'marginTop': '20px', 'flexGrow': '1'},
-                    children=[
-                        dbc.Input(id='search-bar', type='text', placeholder='Search for a game...', className='me-1', style={'width': '1250px', 'height': '50px'}),
-                        html.Div(  # 内部容器，用于更灵活地控制搜索按钮的位置
-                            style={'marginLeft': '20px', 'alignSelf': 'flex-start'},  # 控制内部按钮的左边距和垂直对齐
-                            children=[
-                                dbc.Button('Search', id='search-button', n_clicks=0, color="primary", className='me-2 shadow-sm', style={'fontWeight': 'bold', 'marginTop': '3px'}),
-                            ])]
-                ),
-                html.Div(id='game-details-output', style={'marginTop': '20px'})
-            ]),
+            dcc.Tab(label='Search', children=search_tab_content),
         ]),
     ], style={'backgroundColor': 'white'}),  # 设置整个内容区域背景色为白色
 ])
@@ -696,8 +689,8 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
 
 
         # Ensure an outer join to keep all genres
-        summary_df = games_count.merge(total_plays, on='genre', how='outer')\
-                                .merge(average_rating, on='genre', how='outer')
+        summary_df = games_count.merge(total_plays, on='genre', how='outer')
+        summary_df = summary_df.merge(average_rating, on='genre', how='outer')
 
         # Handle missing values after the merge
         summary_df.fillna({'Game Count': 0, 'Total Plays': 0, 'Average Rating': 'No Rating'}, inplace=True)
@@ -735,129 +728,7 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
             graphs = [dcc.Graph(figure=fig)]
             
         return graphs, {'display': 'block'}
-
-
-
-
-
-
     return graphs, {'display': 'none'}  # Default return when "Rank of Genre" is not selected
-
-# -----------------------------------------------------------------------------------------------------------------
-
-
-
-
-# Callback to update the searched game data
-@app.callback(
-    Output('game-details-output', 'children'),
-    [Input('search-button', 'n_clicks'),
-     Input('date-picker-range', 'start_date'),
-     Input('date-picker-range', 'end_date')],
-    [State('search-bar', 'value'),
-     State('upload-data', 'contents')]
-)
-
-def search_game(n_clicks_search, start_date, end_date, search_value, content):
-    ctx = callback_context
-
-    # Determine which button was clicked
-    if not ctx.triggered:
-        button_id = 'No buttons clicked yet'
-    else:
-        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-    
-    # If the search button was clicked and there's valid input and file content
-    if button_id == 'search-button' and n_clicks_search and search_value and content:
-        content_type, content_string = content.split(',')
-        decoded = base64.b64decode(content_string)
-        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
-        df['date'] = pd.to_datetime(df['date'])
-
-        # Normalize case for a case-insensitive full match
-        search_value_lower = search_value.lower()
-        df['name_lower'] = df['name'].str.lower()
-
-        # Check for a full match rather than a partial match
-        match_df = df[df['name_lower'] == search_value_lower]
-            
-        
-        if not match_df.empty:
-            # Assuming the first match is the desired one
-            game_info = match_df.iloc[0][['name', 'date', 'genre', 'developer', 'platform', 'rating', 'wishlists', 'description']].to_dict()
-            #return [html.P(f"{game_info['name']} found")]
-            game_details = [
-                html.H4(game_info.get('name', 'No Name')),
-                html.P(f"Date: {game_info['date'].strftime('%Y-%m-%d') if pd.notna(game_info['date']) else 'No information available'}"),
-                html.P(f"Genre: {game_info['genre'] if pd.notna(game_info['genre']) else 'No information available'}"),
-                html.P(f"Developer: {game_info['developer'] if pd.notna(game_info['developer']) else 'No information available'}"),
-                html.P(f"Platform: {game_info['platform'] if pd.notna(game_info['platform']) else 'No information available'}"),
-                html.P(f"Rating: {game_info['rating'] if pd.notna(game_info['rating']) else 'No information available'}"),
-                html.P(f"Wishlists: {game_info['wishlists'] if pd.notna(game_info['wishlists']) else 'No information available'}"),
-                html.P(f"Description: {game_info['description'] if pd.notna(game_info['description']) else 'No information available'}"),
-            ]
-
-            # Exclude the searched game itself from similar game search
-            curr_game = game_info['name']
-            
-            # Filter for games with genre and rating
-            no_genre = pd.isna(game_info['genre'])
-            no_rating = pd.isna(game_info['rating'])
-
-            if no_genre:
-                return game_details + [html.P("Not enough information to find similar games.")]
-            
-            genre_filter = df['genre'].str.contains(game_info['genre'], case=False, na=False)
-            date_filter = (df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))
-            relevant_games_df = df[genre_filter & date_filter & (df['name'] != curr_game)]
-
-            game_count = relevant_games_df.shape[0]
-            if game_count == 0:
-                top_games_details = [html.P("There are no similar games within the selected time frame.")]
-                return game_details + top_games_details
-            else:
-                top_games_df = relevant_games_df.sort_values(by='rating', ascending=False).head(min(5, game_count))
-                header_text = f"Top {min(game_count, 5)} games in the same genre and time frame:"
-                top_games_details = [html.H5(header_text)]
-                top_games_details.extend([
-                html.P([
-                    game['name'],
-                    html.Br(),  # This inserts an actual HTML line break element
-                    f"Rating: {game['rating']}"]) for _, game in top_games_df.iterrows()
-                ])
-                
-            if no_rating:
-                return game_details + top_games_details
-            else:
-                # The date and rating of the specific game
-                game_rating = game_info['rating']
-                game_date = pd.to_datetime(game_info['date'])
-                # Take away games with no ratings
-                rating_rank_df = relevant_games_df.dropna(subset=['rating'])
-                rating_rank_df = pd.concat([rating_rank_df, match_df], ignore_index=True)          
-                # Calculate ranks and percentile ranks
-                rating_rank_df['rating_rank'] = rating_rank_df['rating'].rank(method='max')  # Use 'max' to handle ties
-                rating_rank_df['percentile_rank'] = rating_rank_df['rating_rank'] / len(rating_rank_df) * 100
-                # Find the percentile rank for the specific game
-                game_percentile = rating_rank_df[rating_rank_df['rating'] == game_rating]['percentile_rank'].max()
-                percentile_message = [html.P(f"The rating of {game_info['name']} exceeds {game_percentile:.2f} percent of games for similar games within the selected time frame.")]
-                return game_details + top_games_details + percentile_message
-            
-            
-        else:
-            # No exact match found
-            # Filter for games starting with the search value
-            match_df = df[df['name_lower'].str.startswith(search_value_lower)]
-            if match_df.shape[0] > 0:
-                # Limit to the first 10 games and create a list with each game on a new line
-                games_list = match_df['name'].head(10).tolist()
-                suggestions = [html.P(f"Are you looking for one of these games?")] + \
-                              [html.Div(game) for game in games_list]
-                return suggestions
-            else:
-                no_match_message = html.P("Game information not available.")
-                return [no_match_message]
-    return []
 
     
        
@@ -1374,13 +1245,146 @@ def display_top_developers_metric(clickData, angle, metric, contents):
 
     return children
 
+# Callback to update the searched game data
+@app.callback(
+    Output('game-details-output', 'children'),
+    [Input('search-button', 'n_clicks'),
+     Input('date-picker-range', 'start_date'),
+     Input('date-picker-range', 'end_date')],
+    [State('search-bar', 'value'),
+     State('upload-data', 'contents')]
+)
 
+def search_game(n_clicks_search, start_date, end_date, search_value, content):
+    ctx = callback_context
 
+    # Determine which button was clicked
+    if not ctx.triggered:
+        button_id = 'No buttons clicked yet'
+    else:
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    # If the search button was clicked and there's valid input and file content
+    if button_id == 'search-button' and n_clicks_search and search_value and content:
+        content_type, content_string = content.split(',')
+        decoded = base64.b64decode(content_string)
+        df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
+        df['date'] = pd.to_datetime(df['date'])
 
-import numpy as np
-import pandas as pd
-import plotly.express as px
-from dash import Dash, html, dcc, Input, Output, callback 
+        # Normalize case for a case-insensitive full match
+        search_value_lower = search_value.lower()
+        df['name_lower'] = df['name'].str.lower()
+
+        # Check for a full match rather than a partial match
+        match_df = df[df['name_lower'] == search_value_lower]
+            
+        
+        if not match_df.empty:
+            # Assuming the first match is the desired one
+            game_info = match_df.iloc[0][['name', 'date', 'genre', 'developer', 'platform', 'rating', 'wishlists', 'description']].to_dict()
+            #return [html.P(f"{game_info['name']} found")]
+            game_details = dbc.Card(
+                [
+                    dbc.CardBody([
+                        html.H5("🎮   Game Details"),
+                        html.H5(game_info['name'], className="card-title"),
+                        html.P(f"Release Date: {game_info['date'].strftime('%Y-%m-%d') if pd.notna(game_info['date']) else 'No information available'}", className="card-text"),
+                        html.P(f"Genre: {game_info['genre'] if pd.notna(game_info['genre']) else 'No information available'}", className="card-text"),
+                        html.P(f"Developer: {game_info['developer'] if pd.notna(game_info['developer']) else 'No information available'}", className="card-text"),
+                        html.P(f"Platform: {game_info['platform'] if pd.notna(game_info['platform']) else 'No information available'}", className="card-text"),
+                        html.P(f"Rating: {game_info['rating'] if pd.notna(game_info['rating']) else 'No information available'}", className="card-text"),
+                        html.P(f"Wishlists: {game_info.get('wishlists', 'N/A') if pd.notna(game_info['wishlists']) else 'No information available'}", className="card-text"),
+                        html.P(f"Description: {game_info['description'] if pd.notna(game_info['description']) else 'No information available'}", className="card-text"),
+                    ]),
+                ],
+                style={'marginBottom': '20px', 'backgroundColor': 'rgba(94, 114, 228, 0.25)'}
+            )
+
+            # Exclude the searched game itself from similar game search
+            curr_game = game_info['name']
+
+            # Filter for games with genre and rating
+            no_genre = pd.isna(game_info['genre'])
+            no_rating = pd.isna(game_info['rating'])
+            if no_genre:
+                no_genre_alert = dbc.Alert("Not enough information to find similar games.", color="warning")
+                return [game_details, no_genre_alert]
+
+            genre_filter = df['genre'].str.contains(game_info['genre'], case=False, na=False)
+            date_filter = (df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))
+            relevant_games_df = df[genre_filter & date_filter & (df['name'] != curr_game)]
+
+            game_count = relevant_games_df.shape[0]
+            if game_count == 0:
+                no_games_alert = dbc.Alert("There are no similar games within the selected time frame.", color="secondary")
+                return [game_details, no_games_alert]
+            else:
+                top_games_df = relevant_games_df.sort_values(by='rating', ascending=False).head(min(5, game_count))
+                top_games_details = dbc.Card(
+                    dbc.CardBody([
+                        html.H5(f"🏆   Top {min(game_count, 5)} games in the same genre and time frame"),
+                        html.Ul([html.Li(f"{game['name']} - Rating: {game['rating']}") for _, game in top_games_df.iterrows()])
+                    ]),
+                    className='mt-3'
+                )
+
+            # Extra insights based on ratings
+            no_rating = pd.isna(game_info['rating'])
+            if no_rating:
+                return [game_details, top_games_details]
+
+            # Calculate percentile rank
+            rating_rank_df = relevant_games_df.dropna(subset=['rating'])
+            rating_rank_df['rating_rank'] = rating_rank_df['rating'].rank(method='max')
+            rating_rank_df['percentile_rank'] = rating_rank_df['rating_rank'] / len(rating_rank_df) * 100
+            game_percentile = rating_rank_df.loc[rating_rank_df['rating'] == game_info['rating'], 'percentile_rank'].max()
+            percentile_message = html.Div([
+                dbc.Progress(
+                    value=game_percentile,
+                    max=100,  # 100% is the maximum value
+                    striped=True,  # Adds striped background
+                    animated=True,  # Adds animation to the stripes
+                    color="rgba(94, 114, 228, 0.25)",  # Informational color
+                    style={'height': '30px', 'position': 'relative', 'marginTop':'20px', 'marginBottom': '20px'}  # Set the position to relative for text positioning
+                ),
+                html.Div(
+                    f"The rating of {game_info['name']} exceeds {game_percentile:.2f}% of similar games within the selected time frame.",
+                    style={
+                        'position': 'absolute',  # Absolute positioning to overlay on the progress bar
+                        'top': '0',  # Align top of the text with the top of the progress bar
+                        'width': '100%',  # Match the width of the progress bar
+                        'textAlign': 'center',  # Center the text horizontally
+                        'lineHeight': '30px',  # Line height to vertically center the text (should match the progress bar's height)
+                        'fontWeight':'bold'
+                    }
+                )
+            ], style={'position': 'relative'})
+
+            return [game_details, top_games_details, percentile_message]
+        else:
+            # No exact match found
+            # Filter for games starting with the search value
+            match_df = df[df['name_lower'].str.startswith(search_value_lower)]
+            if match_df.shape[0] > 0:
+                # Limit to the first 10 games and create a list with each game on a new line
+                games_list = match_df['name'].head(10).tolist()
+                suggestions_card = dbc.Card(
+                    dbc.CardBody([
+                        html.H5("🔎   Are you looking for one of these games?"),
+                        html.Ul([html.Li(game) for game in games_list])
+                    ]),
+                    className='mt-3'
+                )
+                return suggestions_card  # Return the suggestions within a styled card
+            else:
+                no_match_message = dbc.Card(
+                    dbc.CardBody([
+                        html.P("Game information not available.")
+                    ]),
+                    className='mt-3'
+                )
+                return no_match_message  # Return the no-match message within a styled card
+    return []
 
 
 
