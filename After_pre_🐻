@@ -158,9 +158,6 @@ card_b = dbc.Card([
 ], style=card_style_b)
 
 
-#-------------------------------------------------------------------------------------------------------
-
-
 filter_bar = html.Div([
         dbc.Select(
             id='time-series-selection',
@@ -305,10 +302,10 @@ search_tab_content = [
         style={'display': 'flex', 'justifyContent': 'flex-start', 'marginRight': '10px', 'marginTop': '20px', 'flexGrow': '1'},
         children=[
             dbc.Input(id='search-bar', type='text', placeholder='Search for a game...', className='me-1', style={'width': '1250px', 'height': '50px'}),
-            html.Div(  # 内部容器，用于更灵活地控制搜索按钮的位置
-                style={'marginLeft': '20px', 'alignSelf': 'flex-start'},  # 控制内部按钮的左边距和垂直对齐
+            html.Div(  
+                style={'marginLeft': '20px', 'alignSelf': 'flex-start'},  
                 children=[
-                    dbc.Button('Search', id='search-button', n_clicks=0, color="primary", className='me-2 shadow-sm', style={'fontWeight': 'bold', 'marginTop': '3px'}),
+                    dbc.Button('Search', id='search-button', n_clicks=0, color="rgba(94, 114, 228)", className='me-2 shadow-sm', style={'fontWeight': 'bold', 'marginTop': '3px'}),
                 ])]
     ),
     html.Div(id='game-details-output', style={'marginTop': '20px'})
@@ -319,25 +316,21 @@ search_tab_content = [
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP])
 
 app.layout = dbc.Container(children=[
-    # 包裹在蓝色背景中的部分
     html.Div([
         html.H1('Games Dashboard', className='text-white', style={'textAlign': 'center'}),
         
-        # 新增：Upload提示和Upload按钮的容器
         html.Div(
             style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'backgroundColor': '#5e72e4', 'color': 'white'},
             children=[
-        # 左侧：Upload提示和Upload按钮的容器
                 html.Div(
                     style={'display': 'flex', 'alignItems': 'center'},
                     children=[
                         # Upload button
                         dcc.Upload(
                             id='upload-data',
-                            children=dbc.Button('Choose File', color="primary", className='me-2 shadow-sm', style={'fontWeight': 'bold', 'marginTop': '10px'}),
+                            children=dbc.Button('Choose File', color="rgba(94, 114, 228, 0.75)", className='me-2 shadow-sm', style={'fontWeight': 'bold', 'marginTop': '10px'}),
                             multiple=False  # Restrict to single file upload
                         ),
-                        # Upload提示文字
                         html.Div(id='data-summary-text', style={'fontWeight': 'bold', 'marginLeft': '15px', 'marginTop': '-5px'})
                     ]
                 ),
@@ -346,18 +339,16 @@ app.layout = dbc.Container(children=[
                     style={'display': 'flex', 'alignItems': 'center'},
                     children=[
 
-                        # 中间：文本提示选择时间段
                         html.Div(
                             style={'fontWeight': 'bold', 'marginRight': '15px', 'marginTop': '-5px'},
                             children="Select the time period you want to analyse: "
                         ),
                         
-                        # 右侧：日期选择器
                         dcc.DatePickerRange(
                             id='date-picker-range',
                             display_format='YYYY-MM-DD',
-                            start_date='1900-01-01',  # 设置默认开始日期为 1900-01-01
-                            end_date=datetime.today().strftime('%Y-%m-%d'),  # 设置默认结束日期为今天的日期
+                            start_date='1900-01-01',  
+                            end_date=datetime.today().strftime('%Y-%m-%d'),  
                             style={'borderRadius': '5px', 'border': 'none'}
                         )
                     ]
@@ -367,35 +358,26 @@ app.layout = dbc.Container(children=[
 
     ], style={'backgroundColor': '#5e72e4', 'padding': '20px'}),
 
-    
-    
-    #------------------------------------------------------------------------------------------------
-    
-    # 在 app.layout 内部添加
+
     dcc.Store(id='genre-list-store'),
     
-    
 
-    #-------------------------------------------------------------------------------------------------
-    
-
-    # 主要内容区域，背景为白色
     html.Div([
         dcc.Tabs(id="tabs", children=[
             dcc.Tab(label='Overview', children=[  
                 html.Div([  # Container for cards with padding
                     dbc.Row(
                         [
-                            dbc.Col(dbc.Card(card_content_a, color="primary", inverse=True)),
+                            dbc.Col(dbc.Card(card_content_a, color="rgba(94, 114, 228)", inverse=True)),
                             dbc.Col(dbc.Card(card_content_b, color="primary", outline=True)),
-                            dbc.Col(dbc.Card(card_content_c, color="primary", inverse=True)),
+                            dbc.Col(dbc.Card(card_content_c, color="rgba(94, 114, 228)", inverse=True)),
                         ],
                         className="mb-4",  # Margin bottom for spacing between rows
                     ),
                     dbc.Row(
                         [
                             dbc.Col(dbc.Card(card_content_d, color="primary", outline=True)),
-                            dbc.Col(dbc.Card(card_content_e, color="primary", inverse=True)),
+                            dbc.Col(dbc.Card(card_content_e, color="rgba(94, 114, 228)", inverse=True)),
                             dbc.Col(dbc.Card(card_content_f, color="primary", outline=True)),
                         ],
                         className="mb-4",  # Increase margin bottom if needed
@@ -407,16 +389,10 @@ app.layout = dbc.Container(children=[
                     children=[html.H2("Time Series Analysis")],
                 ),
 
-                # 新增：filter bar
                 filter_bar,
                 genre_checklist,
                 enter_year,
 
-                #-----------------------------------------------------------------------------------------
-
-
-                
-                # 用于显示时间序列图表的container
                 dbc.Row(id='time-series-chart', style={'width': '100%', 'marginTop': '20px'}),
 
 
@@ -436,7 +412,7 @@ app.layout = dbc.Container(children=[
 
             dcc.Tab(label='Search', children=search_tab_content),
         ]),
-    ], style={'backgroundColor': 'white'}),  # 设置整个内容区域背景色为白色
+    ], style={'backgroundColor': 'white'}), 
 ])
 
 @app.callback(
@@ -511,8 +487,6 @@ def update_summary(content, filename, start_date, end_date):
     return summary_text, num_games, num_genres, unique_developers, avg_plays, avg_rating, num_description
 
 
-# ----------以下为更新-------------------------------------------------------------------------------------------
-
 
 @app.callback(
     Output('genre-list-store', 'data'),
@@ -521,18 +495,15 @@ def update_summary(content, filename, start_date, end_date):
 def update_genre_list(contents):
     if contents is None:
         raise PreventUpdate
-
-    # 解析上传的文件内容
+        
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
 
-    # 'genre' 列中的每个条目包含多个用逗号分隔的类型
     genres = set()
     for genre_list in df['genre'].dropna().unique():
         genres.update([genre.strip() for genre in genre_list.split(',')])
     
-    # 返回所有唯一的游戏类型
     return list(genres)
 
 
@@ -543,7 +514,6 @@ def update_genre_list(contents):
 def set_checklist_options(genres):
     if not genres:
         return []
-    # 确保选项按字母顺序排序，以便用户容易查找
     return [{'label': genre, 'value': genre} for genre in sorted(genres)]
 
 
@@ -557,7 +527,7 @@ def set_checklist_options(genres):
      Input('date-picker-range', 'start_date'),
      Input('date-picker-range', 'end_date'),
      Input('time-series-selection', 'value'),
-     Input('genre-checklist', 'value'), # 接收checklist的输入
+     Input('genre-checklist', 'value'), 
      Input('year-input', 'value')  # Include the year from the input box
     
 ] 
@@ -638,7 +608,7 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
                         genre_specific_data.index = genre_specific_data.index.to_period(resample_code).start_time
 
                         fig2.add_trace(go.Scatter(x=genre_specific_data.index, y=genre_specific_data, mode='lines+markers', name=f'Games in {genre}'))
-                        data_available = True  # 至少有一个genre有数据
+                        data_available = True 
 
                         
             if not fig2.data:
@@ -732,8 +702,7 @@ def update_time_series_chart(contents, start_date, end_date, time_series_selecti
 
     
        
-    
-#新增relationship
+
 @app.callback(
     Output('reviews-rating-chart', 'children'),
     [Input('date-picker-range', 'start_date'),
@@ -744,16 +713,13 @@ def update_reviews_rating_chart(start_date, end_date, contents):
     if contents is None:
         raise PreventUpdate
     
-    # 解析上传的文件
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
     
-    # 过滤数据集以符合选择的日期范围
     df['date'] = pd.to_datetime(df['date'])
     filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
     
-    # 生成散点图
     fig = px.scatter(filtered_df, x='reviews', y='rating', 
                      title='Relationship between Number of Reviews and Rating',
                      hover_data=['name'])  
@@ -776,16 +742,13 @@ def update_plays_playing_chart(start_date, end_date, contents):
     if contents is None:
         raise PreventUpdate
     
-    # 解析上传的文件
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
     
-    # 过滤数据集以符合选择的日期范围
     df['date'] = pd.to_datetime(df['date'])
     filtered_df = df[(df['date'] >= start_date) & (df['date'] <= end_date)].copy()
     
-    # 生成散点图
     fig = px.scatter(filtered_df, x='plays', y='playing', 
                      title='Relationship between Plays and Playing',
                      hover_data=['name'])  
@@ -841,17 +804,14 @@ def update_distribution_bar_chart(angle, start_date, end_date, contents):
     if contents is None:
         return {}, {'display': 'none'}
 
-    # 解析上传的文件
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
 
-    # 过滤数据集以符合选择的日期范围
     df['date'] = pd.to_datetime(df['date'])
     filtered_df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))]
 
     if angle == 'genre':
-        # 分类处理和柱状图制作 - Genre
         filtered_df['genre'] = filtered_df['genre'].str.split(', ')
         exploded_df = filtered_df.explode('genre')
         specified_genres = ['Indie', 'Adventure', 'Simulator', 'RPG', 'Strategy', 'Shooter', 'Puzzle', 'Arcade']
@@ -862,7 +822,6 @@ def update_distribution_bar_chart(angle, start_date, end_date, contents):
         return fig, {'display': 'block'}
 
     elif angle == 'platform':
-        # 分类处理和柱状图制作 - Platform
         filtered_df['platform'] = filtered_df['platform'].str.split(', ')
         exploded_df = filtered_df.explode('platform')
         specified_platforms = ['Windows PC', 'Mac', 'Nintendo Switch', 'PlayStation 4', 'Linux', 'iOS', 'Xbox One', 'Android']
@@ -872,7 +831,7 @@ def update_distribution_bar_chart(angle, start_date, end_date, contents):
         fig = px.bar(platform_counts, x='platform', y='count', title='Platform Distribution')
         return fig, {'display': 'block'}
 
-    return {}, {'display': 'none'}  # 如果未选择有效的 angle，不显示图表
+    return {}, {'display': 'none'} 
 
 
 
@@ -889,25 +848,21 @@ def display_top_details_by_selection(angle, clickData, contents, metric):
     ctx = dash.callback_context
 
     if not ctx.triggered or contents is None:
-        # 如果没有触发器或者内容为空，则提示用户上传数据
         return 'Upload data to see the top developer.'
 
-    # 判断是哪个输入触发了回调
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    # 处理上传的数据
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
 
-    # 根据触发器和angle的值确定显示哪个开发者
     if trigger_id == 'angle-selector' or trigger_id == 'metric-selector':
         default_label = 'Indie' if angle == 'genre' else 'Windows PC'
         clicked_label = default_label
     elif clickData:
         clicked_label = clickData['points'][0]['x']
     else:
-        clicked_label = 'Indie'  # 或者根据context设置一个合适的默认值
+        clicked_label = 'Indie' 
 
     required_columns = {'name', 'date', 'genre', 'developer', 'platform', 'rating', 'reviews', 'plays', 'description'}
     if not required_columns.issubset(df.columns):
@@ -926,13 +881,12 @@ def display_top_details_by_selection(angle, clickData, contents, metric):
         else:
             filtered_data = df[df[filter_column] == clicked_label]
         
-        # 检查 filtered_data 是否为空
         if not filtered_data.empty:
             top_items = filtered_data.nlargest(5, metric)
         else:
-            return [], {'display': 'none'}  # 如果过滤后没有数据，返回隐藏样式
+            return [], {'display': 'none'}  
     else:
-        return [], {'display': 'none'}  # 如果没有 clicked_label，返回隐藏样式
+        return [], {'display': 'none'} 
 
     children = [html.H4(f"🥳   Top 5 Games in '{clicked_label}' by {metric.capitalize()}", style={'marginTop':'10px'})]
     for _, row in top_items.iterrows():
@@ -953,7 +907,6 @@ def display_top_details_by_selection(angle, clickData, contents, metric):
 
 
 
-
 @app.callback(
     [Output('distribution-metrics-chart', 'figure'),
      Output('distribution-metrics-chart', 'style')],
@@ -965,7 +918,7 @@ def display_top_details_by_selection(angle, clickData, contents, metric):
 )
 def update_metrics_chart(angle, metric, start_date, end_date, contents):
     if contents is None or not metric or metric not in ['plays', 'rating', 'reviews']:
-        return {}, {'display': 'none'}  # 隐藏图表
+        return {}, {'display': 'none'} 
 
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
@@ -989,13 +942,10 @@ def update_metrics_chart(angle, metric, start_date, end_date, contents):
     metric_data = exploded_df.groupby(filter_column)[metric].mean().reset_index()
     metric_data.columns = [filter_column, f'average_{metric}']
 
-    # 对数据进行排序，以便图表按照平均值从高到低显示
     metric_data.sort_values(f'average_{metric}', ascending=False, inplace=True)
 
-    # 计算排名并添加一个新列以指示前三名
     metric_data['Top 3'] = metric_data[f'average_{metric}'].rank(ascending=False) <= 3
 
-    # 使用条件颜色设置突出显示前三名
     fig = px.bar(metric_data, x=filter_column, y=f'average_{metric}', 
                  title=f'Average {metric.capitalize()} by {angle.capitalize()}',
                  color='Top 3',
@@ -1004,11 +954,8 @@ def update_metrics_chart(angle, metric, start_date, end_date, contents):
     fig.for_each_trace(lambda t: t.update(name = 'Top 3' if t.name == 'True' else 'Others'))
 
     return fig, {'display': 'block'}
-
     
     
-
-
 
 @app.callback(
     Output('unique-developers-output', 'children'),
@@ -1018,44 +965,33 @@ def update_metrics_chart(angle, metric, start_date, end_date, contents):
     prevent_initial_call=True
 )
 def display_unique_developers_by_selection(clickData, angle, contents):
-    # 如果没有上传数据，则不更新
     ctx = dash.callback_context
 
     if not ctx.triggered or contents is None:
-        # 如果没有触发器或者内容为空，则提示用户上传数据
         return 'Upload data to see the top developer.'
 
-    # 判断是哪个输入触发了回调
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    # 处理上传的数据
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
 
-    # 根据触发器和angle的值确定显示哪个开发者
     if trigger_id == 'angle-selector':
-        # 如果是 angle-selector 触发的，使用默认标签
         default_label = 'Indie' if angle == 'genre' else 'Windows PC'
         clicked_label = default_label
     else:
-        # 否则，使用 clickData 中的信息
         clicked_label = clickData['points'][0]['x'] if clickData else 'Indie'
 
-    # 过滤得到相应的数据
     df_filtered = filter_data(df, clicked_label, angle)
 
-    # 计算唯一开发者的数量
     unique_developers = df_filtered['developer'].nunique()
 
-    # 构建输出显示的内容
     return html.Div([
         html.H3(f"💻   Number of Developers under '{clicked_label}':", style={'fontSize': '16px', 'fontWeight': 'bold', 'color':'white'}),
         html.P(f"{unique_developers}", style={'fontSize': '24px', 'marginTop': '10px', 'fontWeight': 'bold', 'color':'white'})
     ])
 
 def filter_data(df, label, filter_column):
-    # 根据给定的列和标签筛选数据，处理 'Others' 选项
     specified = {
         'genre': ['Indie', 'Adventure', 'Simulator', 'RPG', 'Strategy', 'Shooter', 'Puzzle', 'Arcade'],
         'platform': ['Windows PC', 'Mac', 'Nintendo Switch', 'PlayStation 4', 'Linux', 'iOS', 'Xbox One', 'Android']
@@ -1079,27 +1015,20 @@ def display_top_developer_by_selection(clickData, angle, contents):
     ctx = dash.callback_context
 
     if not ctx.triggered or contents is None:
-        # 如果没有触发器或者内容为空，则提示用户上传数据
         return 'Upload data to see the top developer.'
 
-    # 判断是哪个输入触发了回调
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    # 处理上传的数据
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
 
-    # 根据触发器和angle的值确定显示哪个开发者
     if trigger_id == 'angle-selector':
-        # 如果是 angle-selector 触发的，使用默认标签
         default_label = 'Indie' if angle == 'genre' else 'Windows PC'
         clicked_label = default_label
     else:
-        # 否则，使用 clickData 中的信息
         clicked_label = clickData['points'][0]['x'] if clickData else 'Indie'
 
-    # 根据 angle 设置默认点击标签
     specified_categories = {
         'genre': ['Indie', 'Adventure', 'Simulator', 'RPG', 'Strategy', 'Shooter', 'Puzzle', 'Arcade'],
         'platform': ['Windows PC', 'Mac', 'Nintendo Switch', 'PlayStation 4', 'Linux', 'iOS', 'Xbox One', 'Android']
@@ -1127,9 +1056,6 @@ def display_top_developer_by_selection(clickData, angle, contents):
 
 
 
-
-
-
 @app.callback(
     Output('top-developer-metric-output', 'children'),
     [Input('distribution-bar-chart', 'clickData'),
@@ -1142,33 +1068,27 @@ def display_top_developers_metric(clickData, angle, metric, contents):
     ctx = dash.callback_context
 
     if not ctx.triggered or contents is None:
-        # 如果没有触发器或者内容为空，则提示用户上传数据
         return 'Upload data to see the top developer.'
 
-    # 判断是哪个输入触发了回调
     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    # 处理上传的数据
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_csv(io.StringIO(decoded.decode('utf-8')))
 
-    # 根据触发器和angle的值确定显示哪个开发者
     if trigger_id == 'angle-selector' or trigger_id == 'metric-selector':
         default_label = 'Indie' if angle == 'genre' else 'Windows PC'
         clicked_label = default_label
     elif clickData:
         clicked_label = clickData['points'][0]['x']
     else:
-        clicked_label = 'Indie'  # 或者根据context设置一个合适的默认值
+        clicked_label = 'Indie'
 
-    # 根据选择的角度设置默认标签
     specified_categories = {
         'genre': ['Indie', 'Adventure', 'Simulator', 'RPG', 'Strategy', 'Shooter', 'Puzzle', 'Arcade'],
         'platform': ['Windows PC', 'Mac', 'Nintendo Switch', 'PlayStation 4', 'Linux', 'iOS', 'Xbox One', 'Android']
     }
 
-    # 根据角度选择器的值筛选数据
     filter_column = 'genre' if angle == 'genre' else 'platform'
     specified = specified_categories[filter_column]
 
@@ -1177,14 +1097,11 @@ def display_top_developers_metric(clickData, angle, metric, contents):
     else:
         df_filtered = df[df[filter_column].str.contains(clicked_label, na=False)]
 
-    # 计算每个开发者的平均metric值
     if metric in ['plays', 'rating', 'reviews']:
         developer_metric_avg = df_filtered.groupby('developer')[metric].mean().reset_index()
         developer_metric_avg.columns = ['developer', f'average_{metric}']
         developer_metric_avg.sort_values(by=f'average_{metric}', ascending=False, inplace=True)
 
-
-        # 创建滚动容器并添加每个开发者的详细信息
         children = html.Div(
             [
                 html.Div(
@@ -1385,7 +1302,6 @@ def search_game(n_clicks_search, start_date, end_date, search_value, content):
                 )
                 return no_match_message  # Return the no-match message within a styled card
     return []
-
 
 
 
